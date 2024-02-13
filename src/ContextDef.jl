@@ -4,6 +4,10 @@ using Parameters
 
 abstract type Mixin end
 
+abstract type Role end
+
+abstract type Team end
+
 abstract type Context end
 
 #### Context rule (condition) regarded type definitions ####
@@ -90,7 +94,10 @@ end
 	activeContexts::Vector{Context} = []
 	mixins::Dict{Context, Dict{Any, Vector{DataType}}} = Dict()
 	mixinTypeDB::Dict{Any, Dict{Context, DataType}} = Dict()
-	mixinDB::Dict{Any, Dict{Context, Any}} = Dict()
+	mixinDB::Dict{Any, Dict{Context, Vector{Any}}} = Dict()
+	teamsAndRoles::Dict{Context, Dict{Any, Dict{DataType, DataType}}} = Dict()
+	roleDB::Dict{Any, Dict{Context, Dict{Any, Vector{Any}}}} = Dict()
+	teamDB::Dict{Context, Dict{Any, Vector{Dict{DataType, Any}}}} = Dict()
 end
 
 @with_kw mutable struct ContextControl
@@ -170,14 +177,26 @@ function isActive(context::T) where {T <: Context}
 end
 
 function addMixin(context, contextualType, mixinNameSymbol)
-	if (context) in keys(contextManager.mixins)
-		if (contextualType) in keys(contextManager.mixins[context])
+	if context in keys(contextManager.mixins)
+		if contextualType in keys(contextManager.mixins[context])
 			push!(contextManager.mixins[context][contextualType], mixinNameSymbol)
 		else
 			contextManager.mixins[context][contextualType] = [mixinNameSymbol]
 		end
 	else
 		contextManager.mixins[context] = Dict((contextualType)=>[mixinNameSymbol])
+	end
+end
+
+function addTeam(context, team, rolesAndTypes::Dict{DataType, DataType})
+	if context in keys(contextManager.teamsAndRoles)
+		if team in keys(contextManager.teamsAndRoles[context])
+			error("Context already contains team with name")
+		else
+			contextManager.teamsAndRoles[context][team] = rolesAndTypes
+		end
+	else
+		contextManager.teamsAndRoles[context] = Dict((team)=>rolesAndTypes)
 	end
 end
 
@@ -189,8 +208,117 @@ function getMixins(type)
 	contextManager.mixinDB[type]
 end
 
-function getMixin(type, context::T) where {T <: Context}
+function getMixins(type, context::T) where {T <: Context}
 	(contextManager.mixinDB[type])[context]
+end
+
+function getMixin(type, mixin::Type, context::T) where {T <: Context}
+	if !(mixin in contextManager.mixins[context][typeof(type)])
+		error("Mixin $mixin not defined in context $context for type $(typeof(type))")
+	end
+	for m in (contextManager.mixinDB[type])[context]
+		if typeof(m) == mixin
+			return m
+		end
+	end
+	nothing
+end
+
+function getRoles(obj, role::Type, team::Team, context::Context)
+	roles = []
+	for concreteRole in contextManager.roleDB[obj][context][team]
+		if typeof(concreteRole) == role
+			push!(roles, concreteRole)
+		end
+	end
+	return roles
+end
+
+function hasRole(obj, role::Type, team::Team, context::Context)
+	for concreteRole in getRoles(obj, team, context)
+		if typeof(concreteRole) == role
+			return true
+		end
+	end
+	false
+end
+
+function hasRole(obj, roleType::Type, teamType::Type, context::Context)
+	for team in keys(contextManager.roleDB[obj][context])
+		for role in getRoles(obj, team, context)
+			if typeof(role) == roleType
+				return true
+			end
+		end
+	end
+	false
+end
+
+function getRoles(obj, team::Team, context::Context)
+	return contextManager.roleDB[obj][context][team]
+end
+
+function getRoles(obj, context::Context)
+	return contextManager.roleDB[obj][context]
+end
+
+function getRoles(obj)
+	return contextManager.roleDB[obj]
+end
+
+function getTeams(teamType::Type, rolePairs::Vector, context::T) where {T <: Context}
+	teams = []
+	if !(context in keys(contextManager.teamDB))
+		return teams
+	end
+	for (team, rolesObjs ) in contextManager.teamDB[context]
+		roleDict = Dict(rolePairs...)
+		if  roleDict in rolesObjs
+			push!(teams, team)
+		end
+	end
+	return teams
+end
+
+function getTeamPartners(obj::Any, roleType::Type, team::Team, context::Context)
+	groups = contextManager.teamDB[context][team]
+	partners = Dict()
+	for group in groups
+		if roleType in keys(group)
+			if group[roleType] == obj
+				partners = group
+			end
+		end
+	end
+	if roleType in keys(partners) 
+		delete!(partners, roleType)
+	else
+		error("Role $roleType not assigned to $obj for team $team in context $context")
+	end
+	partners
+end
+
+function getTeamPartners(obj::Any, roleType::Type, teamType::Type, context::Context)
+	groups = []
+	for team in contextManager.teamDB[context]
+		if typeof(team[1]) == teamType
+			push!(groups, (contextManager.teamDB[context][team[1]])...)
+		end
+	end
+	partners = Dict()
+	for group in groups
+		if roleType in keys(group)
+			if group[roleType] == obj
+				partners = copy(group)
+			end
+		end
+	end
+	if roleType in keys(partners) 
+		delete!(partners, roleType)
+	else
+		error("Role $roleType not assigned to $obj for team $teamType in context $context")
+	end
+	partners
 end
 
 macro newContext(contextName)
@@ -209,10 +337,10 @@ macro newContext(contextName)
 	end
 end
 
-
 macro newMixin(mixin, attributes, context)
-	contextualType = Symbol(strip((split(repr(mixin), "<:")[2])[1:end-1]))
-	mixin = Symbol(strip((split(repr(mixin), " <: ")[1])[3:end]))
+	typeMixinList = split(repr(mixin), "<<")
+	contextualType = Symbol(strip((typeMixinList[2])[1:end-1]))
+	mixin = Symbol(strip((typeMixinList[1])[3:end]))
 	Base.remove_linenums!(attributes)
 
 	newStructExpr = :(struct $mixin <: Mixin
@@ -222,16 +350,110 @@ macro newMixin(mixin, attributes, context)
 	return esc(:($newStructExpr; addMixin($context, $contextualType, $mixin)))
 end
 
+macro newTeam(teamName, teamContent, contextName)
+	if typeof(contextName) == String || typeof(contextName) == Symbol
+		if typeof(contextName) == String
+			contextName = Meta.parse(contextName)
+		end
+	else
+		error("Last argument must be a String or a Symbol")
+	end
+	if typeof(teamName) == String || typeof(teamName) == Symbol
+		if typeof(teamName) == String
+			teamName = Meta.parse(teamName)
+		end
+	else
+		error("First argument must be a String or a Symbol")
+	end
+
+	returnExpr = quote end
+
+	Base.remove_linenums!(teamContent)
+	relationalArgExpr = quote end
+	roles = Dict()
+	rolesAndTypes = Dict()
+	for arg in teamContent.args
+		if !(arg.head == :macrocall)
+			error("Block must begin with @relationalAttributes or @roles")
+		end
+		if arg.args[1] === Symbol("@relationalAttributes")
+			push!(relationalArgExpr.args, ((arg.args[3]).args)...)
+		elseif arg.args[1] === Symbol("@role")
+			typeRoleList = split(repr(arg.args[3]), "<<")
+			contextualType = Symbol(strip((typeRoleList[2])[1:end-1]))
+			role = Symbol(strip((typeRoleList[1])[3:end]))
+			if role in keys(roles)
+				error("Role names of team must be unique")
+			end
+			roles[role] = arg.args[4]
+			rolesAndTypes[role] = contextualType
+		else
+			error("Block must begin with @relationalAttributes or @roles")
+		end
+	end
+
+	if length(roles) < 2
+		error("Team definition must at least contain two roles")
+	end
+
+	push!(returnExpr.args, :(struct $teamName <: Team 
+							 	$relationalArgExpr
+							 end))
+
+	for (role, attrs) in roles
+		roleDef = :(struct $role <: Role
+			$attrs
+		end)
+		push!(returnExpr.args, roleDef)
+	end
+
+	rolesAndTypesExpr = :(Dict())
+	for (role, type) in rolesAndTypes
+		push!(rolesAndTypesExpr.args, :($role => $type))
+	end
+
+	push!(returnExpr.args, :(addTeam($contextName, $teamName, $rolesAndTypesExpr)))	
+	return esc(returnExpr)
+end
+
+function Base.:(<<)(mixin::DataType, type::DataType)
+	if mixin <: Mixin
+		for entry in values(contextManager.mixins)
+			for (key, list) in entry
+				if (key == type) & (mixin in list)
+					return true
+				end
+			end
+		end
+	elseif mixin <: Role
+		for entry in values(contextManager.teamsAndRoles)
+			for teamEntry in values(entry)
+				println(teamEntry)
+				for (key, value) in teamEntry
+					if (key == mixin) & (value == type)
+						return true
+					end
+				end
+			end
+		end
+	end
+	false
+end
+
 function assignMixin(pair::Pair, context::T) where {T<:Context}
 	type = pair[1]
 	mixin = pair[2]
+	if !(typeof(mixin) in contextManager.mixins[context][typeof(type)])
+		error("Mixin $mixin can not be assigned to Type $type")
+	end
 	if type in keys(contextManager.mixinDB)
 		if context in keys(contextManager.mixinDB[type])
-			@warn(repr(type)*" already has Mixin in context "*repr(context)*". Previous Mixin will be overwritten!")
+			push!(contextManager.mixinDB[type][context], mixin)
+		else
+			contextManager.mixinDB[type][context] = [mixin]
 		end
-		contextManager.mixinDB[type][context] = mixin
 	else
-		contextManager.mixinDB[type] = Dict(context => mixin)
+		contextManager.mixinDB[type] = Dict(context => [mixin])
 	end
 	if type in keys(contextManager.mixinTypeDB)
 		contextManager.mixinTypeDB[type][context] = typeof(mixin)
@@ -255,6 +477,113 @@ function disassignMixin(pair::Pair, context::T) where {T<:Context}
 	end
 end
 
+macro assignRoles(team, attrs, context)
+	teamExpr = :($team())
+	roleExpr = :()
+	Base.remove_linenums!(attrs)
+	for arg in attrs.args
+		distingArray = split(repr(arg), "=")
+		assignment = split(distingArray[1], ">>")
+		if length(assignment) > 1
+			assignment = split(repr(arg), ">>")
+			push!(roleExpr.args, Meta.parse(assignment[1][3:end]*" => "*assignment[2][1:end-1]))
+		else
+			push!(teamExpr.args, arg)
+		end
+	end
+	return esc(:(assignRoles($teamExpr, [$roleExpr...], $context)))
+end
+
+function assignRoles(team::T, roles::Vector, context::C) where {T <: Team, C<:Context}
+	roleTypes = []
+	for pair in roles
+		push!(roleTypes, typeof(pair[2]) => pair[1])
+	end
+	currentTeam = getTeams(typeof(team), roleTypes, context)
+	if (team in getTeams(typeof(team), roleTypes, context))
+		error("Team $team is already assigned with the roles $roles")
+	end
+
+	for rolePair in roles
+		obj = rolePair[1]
+		role = rolePair[2]
+		if !(typeof(obj) == contextManager.teamsAndRoles[context][typeof(team)][typeof(role)])
+			error("Role $(typeof(role)) can not be assigned to Type $(typeof(obj))")
+		end
+		if !(obj in keys(contextManager.roleDB))
+			contextManager.roleDB[obj] = Dict()
+		end
+		if !(context in keys(contextManager.roleDB[obj]))
+			contextManager.roleDB[obj][context] = Dict()
+		end
+		if !(team in keys(contextManager.roleDB[obj][context]))
+			contextManager.roleDB[obj][context][team] = []
+		end
+		push!(contextManager.roleDB[obj][context][team], role)
+	end
+
+	if !(context in keys(contextManager.teamDB))
+		contextManager.teamDB[context] = Dict()
+	end
+	if !(team in keys(contextManager.teamDB[context]))
+		contextManager.teamDB[context][team] = [Dict(roleTypes...)]
+	else
+		push!(contextManager.teamDB[context][team], Dict(roleTypes...))
+	end
+end
+
+function disassignRoles(team::T, roles::Vector, context::C) where {T <: Team, C<:Context}
+	if !(context in keys(contextManager.teamDB))
+		error("No team is assigned context $(context) is not assigned to context $(context)")
+	end
+	if !(team in keys(contextManager.teamDB[context]))
+		error("Team $team is not assigned to context $(context)")
+	end
+	rolesMirrored = []
+	for rolePair in roles
+		obj = rolePair[1]
+		role = rolePair[2]
+		push!(rolesMirrored, role=>obj)
+		if !(obj in keys(contextManager.roleDB))
+			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
+		end
+		if !(context in keys(contextManager.roleDB[obj]))
+			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
+		end
+		if !(team in keys(contextManager.roleDB[obj][context]))
+			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
+		end
+		for (i, concreteRole) in enumerate(contextManager.roleDB[obj][context][team])
+			if typeof(concreteRole) == role
+				deleteat!(contextManager.roleDB[obj][context][team], i)
+				break
+			end
+		end
+		if contextManager.roleDB[obj][context][team] == []
+			delete!(contextManager.roleDB[obj][context], team)
+		end
+	end
+	for (i, roleGroup) in enumerate(contextManager.teamDB[context][team])
+		if roleGroup == Dict(rolesMirrored...)
+			deleteat!(contextManager.teamDB[context][team], i)
+			break
+		end
+	end	
+end
+
+function Base.:(>>)(t, mixin::T, context::C) where {T <: Mixin, C<:Context} 
+	assignMixin(t=>mixin, context)
+end
+
+function Base.:(>>)(t, mixinType::DataType)
+	for t_mixin in [(values(getMixins(t))...)...]
+		if typeof(t_mixin) == mixinType
+			return true
+		end
+	end
+	false
+end
+
 macro context(cname, expr)
 	if typeof(expr) != Expr
 		error("Second argument of @context must be a function or macro call or function definition")
@@ -269,21 +598,17 @@ macro context(cname, expr)
 			expr.args[1] = eval(Meta.parse(functionHeaderString))
 			return esc(expr)
 		elseif expr.head == :call
-			callString = repr(expr)
-			contextString = repr(cname)
-			if endswith(callString, "())")
-				callString = callString[1:end-2] *  contextString[2:end] * "))"
-			else
-				callString = callString[1:end-2] * ", " * contextString[2:end] * "))"
+			push!(expr.args, cname)
+			return esc(expr)
+		elseif expr.head == :.
+			if !(expr.args[1].head == :call)
+				error("Second argument of @context must be a function or macro call or function definition")
 			end
-			callExpr = Meta.parse(callString)
-			return esc(eval(callExpr))
+			push!((expr.args[1]).args, cname)
+			return esc(expr)
 		elseif expr.head == :macrocall
-			callString = repr(expr)
-			contextString = repr(cname)
-			callString = callString[3:end-1] * " " * contextString[2:end] 
-			callExpr = Meta.parse(callString)
-			return esc(callExpr)
+			push!(expr.args, cname)
+			return esc(expr)
 		else
 			error("Second argument of @context must be a function or macro call or function definition")
 		end
@@ -299,6 +624,9 @@ function isActive(contextRule::T) where {T <: AbstractContextRule}
 		!isActive(contextRule.c)
 	end
 end
+
+
+#### Functions relating to Context Rules ####
 
 function getContextsOfRule(contextRule::T) where {T <: AbstractContextRule}
 	contexts = []
@@ -338,6 +666,9 @@ end
 function Base.:!(c::CT) where {CT <: Union{Context, AbstractContextRule}}
     NotContextRule(c)
 end
+
+
+#### Function relating to Petri Nets ####
 
 function mergeCompiledPetriNets(pn1::Union{Nothing, CompiledPetriNet}, pn2::Union{Nothing, CompiledPetriNet})
     typeof(pn1) == Nothing ? pn2 : pn1
@@ -409,6 +740,37 @@ function mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
                      ContextMap_merge)
 end
 
+function reduceRuleToElementary(cr::AndContextRule)
+	cr
+end
+
+function reduceRuleToElementary(cr::OrContextRule)
+	cr
+end
+
+function reduceRuleToElementary(c::Context)
+	c
+end
+
+function reduceRuleToElementary(c::Nothing)
+	nothing
+end
+
+function reduceRuleToElementary(cr::NotContextRule)
+	if typeof(cr.c) == AndContextRule
+		return OrContextRule(reduceRuleToElementary(!(cr.c.c1)), reduceRuleToElementary(!(cr.c.c2)))
+	end
+	if typeof(cr.c) == OrContextRule
+		return AndContextRule(reduceRuleToElementary(!(cr.c.c1)), reduceRuleToElementary(!(cr.c.c2))) 
+	end
+	if typeof(cr.c) == NotContextRule
+		return reduceRuleToElementary(cr.c.c)
+	end
+	if typeof(cr.c) <: Context
+		return cr
+	end
+end
+
 function genContextRuleMatrix(cr::T, cdict::Dict, nc::Int) where {T <: Union{Context, Any, AbstractContextRule}}
     matrix = zeros(1, nc)
     if typeof(cr) <: AbstractContextRule
@@ -466,7 +828,7 @@ function compile(pn::PetriNet)
     C = nothing                                         # Context matrix
     U = zeros(Float64, nc, nt)                          # Update matrix
     for transition in pn.transitions
-        c = sign.(genContextRuleMatrix(transition.contexts, cdict, nc))
+        c = sign.(genContextRuleMatrix(reduceRuleToElementary(transition.contexts), cdict, nc))
         C == nothing ? C = [c] : C = [C; [c]]
         for update in transition.updates
             if update.updateValue == on

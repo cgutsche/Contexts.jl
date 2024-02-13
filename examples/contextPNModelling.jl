@@ -17,6 +17,12 @@ arcs = [NormalArc(p1, t1, 2, 1),
 		NormalArc(t2, p1, 1, 1), 
 		InhibitorArc(p3, t2, 3)]
 
+
+a = !(C1 & (C2 | C3))
+println(a)
+b = reduceRuleToElementary(a)
+println(b)
+
 pn = PetriNet([p1, p2, p3], [t1, t2, t3], arcs)
 compiled_pn = compile(pn)
 
