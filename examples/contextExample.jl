@@ -75,7 +75,7 @@ Jane = Person("Jane", 42)
 Jake = Person("Jake", 24)
 
 # now, mixins can be assigned to objects
-assignMixin(John => Employee("Test Inc.", Jake), Business)
+assignMixin(Business, John => Employee("Test Inc.", Jake))
 # you can also use the >> operator in combination with the @context
 @context Family John >> Adult()
 
@@ -89,7 +89,7 @@ println("John has assigned Mixin Employee: ", John >> Employee)
 # Note that this example might be modeled with roles as seen in the
 # contextRolesExample.jl file
 function marry(p1::Person, p2::Person, dayOfMariage::String)
-	assignMixin(p1=>Husband(p2, dayOfMariage), Family)
+	assignMixin(Family, p1=>Husband(p2, dayOfMariage))
 	@context Family assignMixin(p2=>Wife(p1, dayOfMariage))
 end
 
@@ -108,7 +108,7 @@ println("Mixins of Jane: ", getMixins(Jane))
 println(" ")
 
 @context Family function getPartner(person::Person)
-	for mixin in getMixins(person, context)
+	for mixin in getMixins(context, person)
 		if (typeof(mixin) == Husband) | (typeof(mixin) == Wife )
 			return mixin.partner
 		end
@@ -122,11 +122,11 @@ end
 
 println("John's Family Partner: ", @context Family getPartner(John))
 println("John's Business Partner: ", @context Business getPartner(John))
-println("Janes's Family Partner: ", getPartner(Jane, Family))
+println("Jane's Family Partner: ", getPartner(Family, Jane))
 
 function divorce(p1::Person, p2::Person)
-	disassignMixin(p1=>Husband, Family)
-	disassignMixin(p2=>Wife, Family)
+	@context Family disassignMixin(p1=>Husband)
+	@context Family disassignMixin(p2=>Wife)
 end
 
 divorce(John, Jane)
@@ -135,5 +135,5 @@ println(" ")
 println("Mixins of John: ", getMixins(John))
 println(" ")
 
-assignMixin(John=>Employer("Test Inc."), Business)
+assignMixin(Business, John=>Employer("Test Inc."))
 marry(Jane, Jake, "01.01.2023")

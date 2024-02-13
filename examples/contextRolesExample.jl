@@ -91,7 +91,7 @@ end
 # @context Family john >> Husband("test")
 
 println("Mariage teams, where John is Husband and Jane if Wife:")
-println(getTeams(Mariage, [Husband=>john, Wife=>jane], Family))
+println(getTeams(Family, Mariage, [Husband=>john, Wife=>jane]))
 # Well, maybe a stupid example, since you can not be married twice to the same person at the same time
 # Let's fix this mistake
 # to dissasign roles, you must define the exact team and which objects play which roles
@@ -120,15 +120,15 @@ println(@context Family getTeams(Mariage, [Husband=>john, Wife=>jane]))
 							julia=>Mother(),
 							jane=>Child()])
 
-println(getTeams(ParentsAndChild, [Father=>john, Mother=>jane, Child=>jack], Family))
+println(getTeams(Family, ParentsAndChild, [Father=>john, Mother=>jane, Child=>jack]))
 
-println(getRoles(john, Father, ParentsAndChild(), Family))
+println(getRoles(Family, john, Father, ParentsAndChild()))
 
 # jack got adopted 
 @context Family disassignRoles(ParentsAndChild(), [john=>Father, jane=>Mother, jack=>Child])
 
-println(getTeams(ParentsAndChild, [Father=>john, Mother=>jane, Child=>jack], Family))
-println(getTeams(ParentsAndChild, [Father=>john, Mother=>jane, Child=>jake], Family))
+println(getTeams(Family, ParentsAndChild, [Father=>john, Mother=>jane, Child=>jack]))
+println(getTeams(Family, ParentsAndChild, [Father=>john, Mother=>jane, Child=>jake]))
 
 # The @assignRoles macro can be used for clearer syntax
 @context Family @assignRoles Mariage begin
@@ -144,30 +144,30 @@ end
 	jordan>> Child()
 end
 
-println(getTeams(Mariage, [Husband=>jim, Wife=>julia], Family))
+println(getTeams(Family, Mariage, [Husband=>jim, Wife=>julia]))
 
 # Here are some examples how to use roles in functions:
 
 @context Family function getFamilyTree(p::Person)
 	familyTree = []
-	if !(hasRole(p, Child, ParentsAndChild(), context))
+	if !(hasRole(context, p, Child, ParentsAndChild()))
 		return ""
 	end
 	parents = @context Family getTeamPartners(p, Child, ParentsAndChild())
-	"$(p.name) is the child of $(parents[Mother].name) and $(parents[Father].name). " * getFamilyTree(parents[Mother], context) * getFamilyTree(parents[Father], context)
+	"$(p.name) is the child of $(parents[Mother].name) and $(parents[Father].name). " * getFamilyTree(context, parents[Mother]) * (@context context getFamilyTree(parents[Father]))
 end
 
 println(@context Family getFamilyTree(jake))
 
 @context Family function getMariageDate(p1::Person, p2::Person)
-	if hasRole(p1, Husband, Mariage, context)
-		teams = getTeams(Mariage, [Husband=>p1, Wife=>p2], context)
+	if hasRole(context, p1, Husband, Mariage)
+		teams = getTeams(context, Mariage, [Husband=>p1, Wife=>p2])
 		if length(teams) < 1
 			return nothing
 		end
 		return teams[1].dayOfMariage
 	else
-		teams = getTeams(Mariage, [Husband=>p2, Wife=>p1], context)[1].dayOfMariage
+		teams = getTeams(context, Mariage, [Husband=>p2, Wife=>p1])[1].dayOfMariage
 		if length(teams) < 1
 			return nothing
 		end
@@ -180,10 +180,10 @@ println(@context Family getMariageDate(john, julia))
 
 @context Family function getPartner(person::Person)
 	partner = nothing
-	if hasRole(person, Husband, Mariage, context) 
+	if hasRole(context, person, Husband, Mariage) 
 		partner = (@context Family getTeamPartners(person, Husband, Mariage))[Wife]
 	end
-	if hasRole(person, Wife, Mariage, context)
+	if hasRole(context, person, Wife, Mariage)
 		partner = (@context Family getTeamPartners(person, Wife, Mariage))[Husband]
 	end
 	partner

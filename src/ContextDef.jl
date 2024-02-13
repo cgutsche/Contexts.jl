@@ -208,11 +208,11 @@ function getMixins(type)
 	contextManager.mixinDB[type]
 end
 
-function getMixins(type, context::T) where {T <: Context}
+function getMixins(context::Context, type)
 	(contextManager.mixinDB[type])[context]
 end
 
-function getMixin(type, mixin::Type, context::T) where {T <: Context}
+function getMixin( context::Context, type, mixin::Type)
 	if !(mixin in contextManager.mixins[context][typeof(type)])
 		error("Mixin $mixin not defined in context $context for type $(typeof(type))")
 	end
@@ -224,7 +224,7 @@ function getMixin(type, mixin::Type, context::T) where {T <: Context}
 	nothing
 end
 
-function getRoles(obj, role::Type, team::Team, context::Context)
+function getRoles(context::Context, obj, role::Type, team::Team)
 	roles = []
 	for concreteRole in contextManager.roleDB[obj][context][team]
 		if typeof(concreteRole) == role
@@ -234,8 +234,8 @@ function getRoles(obj, role::Type, team::Team, context::Context)
 	return roles
 end
 
-function hasRole(obj, role::Type, team::Team, context::Context)
-	for concreteRole in getRoles(obj, team, context)
+function hasRole(context::Context, obj, role::Type, team::Team)
+	for concreteRole in getRoles(context, obj, team)
 		if typeof(concreteRole) == role
 			return true
 		end
@@ -243,9 +243,9 @@ function hasRole(obj, role::Type, team::Team, context::Context)
 	false
 end
 
-function hasRole(obj, roleType::Type, teamType::Type, context::Context)
+function hasRole(context::Context, obj, roleType::Type, teamType::Type)
 	for team in keys(contextManager.roleDB[obj][context])
-		for role in getRoles(obj, team, context)
+		for role in getRoles(context, obj, team)
 			if typeof(role) == roleType
 				return true
 			end
@@ -254,11 +254,11 @@ function hasRole(obj, roleType::Type, teamType::Type, context::Context)
 	false
 end
 
-function getRoles(obj, team::Team, context::Context)
+function getRoles(context::Context, obj, team::Team)
 	return contextManager.roleDB[obj][context][team]
 end
 
-function getRoles(obj, context::Context)
+function getRoles(context::Context, obj)
 	return contextManager.roleDB[obj][context]
 end
 
@@ -266,7 +266,7 @@ function getRoles(obj)
 	return contextManager.roleDB[obj]
 end
 
-function getTeams(teamType::Type, rolePairs::Vector, context::T) where {T <: Context}
+function getTeams(context::Context, teamType::Type, rolePairs::Vector)
 	teams = []
 	if !(context in keys(contextManager.teamDB))
 		return teams
@@ -280,7 +280,7 @@ function getTeams(teamType::Type, rolePairs::Vector, context::T) where {T <: Con
 	return teams
 end
 
-function getTeamPartners(obj::Any, roleType::Type, team::Team, context::Context)
+function getTeamPartners(context::Context, obj::Any, roleType::Type, team::Team)
 	groups = contextManager.teamDB[context][team]
 	partners = Dict()
 	for group in groups
@@ -298,7 +298,7 @@ function getTeamPartners(obj::Any, roleType::Type, team::Team, context::Context)
 	partners
 end
 
-function getTeamPartners(obj::Any, roleType::Type, teamType::Type, context::Context)
+function getTeamPartners(context::Context, obj::Any, roleType::Type, teamType::Type)
 	groups = []
 	for team in contextManager.teamDB[context]
 		if typeof(team[1]) == teamType
@@ -337,7 +337,7 @@ macro newContext(contextName)
 	end
 end
 
-macro newMixin(mixin, attributes, context)
+macro newMixin(context, mixin, attributes)
 	typeMixinList = split(repr(mixin), "<<")
 	contextualType = Symbol(strip((typeMixinList[2])[1:end-1]))
 	mixin = Symbol(strip((typeMixinList[1])[3:end]))
@@ -350,7 +350,7 @@ macro newMixin(mixin, attributes, context)
 	return esc(:($newStructExpr; addMixin($context, $contextualType, $mixin)))
 end
 
-macro newTeam(teamName, teamContent, contextName)
+macro newTeam(contextName, teamName, teamContent)
 	if typeof(contextName) == String || typeof(contextName) == Symbol
 		if typeof(contextName) == String
 			contextName = Meta.parse(contextName)
@@ -440,7 +440,7 @@ function Base.:(<<)(mixin::DataType, type::DataType)
 	false
 end
 
-function assignMixin(pair::Pair, context::T) where {T<:Context}
+function assignMixin(context::Context, pair::Pair)
 	type = pair[1]
 	mixin = pair[2]
 	if !(typeof(mixin) in contextManager.mixins[context][typeof(type)])
@@ -462,7 +462,7 @@ function assignMixin(pair::Pair, context::T) where {T<:Context}
 	end
 end
 
-function disassignMixin(pair::Pair, context::T) where {T<:Context}
+function disassignMixin(context::Context, pair::Pair)
 	type = pair[1]
 	mixin = pair[2]
 	if type in keys(contextManager.mixinDB)
@@ -477,7 +477,7 @@ function disassignMixin(pair::Pair, context::T) where {T<:Context}
 	end
 end
 
-macro assignRoles(team, attrs, context)
+macro assignRoles(context, team, attrs)
 	teamExpr = :($team())
 	roleExpr = :()
 	Base.remove_linenums!(attrs)
@@ -491,16 +491,16 @@ macro assignRoles(team, attrs, context)
 			push!(teamExpr.args, arg)
 		end
 	end
-	return esc(:(assignRoles($teamExpr, [$roleExpr...], $context)))
+	return esc(:(assignRoles($context, $teamExpr, [$roleExpr...])))
 end
 
-function assignRoles(team::T, roles::Vector, context::C) where {T <: Team, C<:Context}
+function assignRoles(context::Context, team::Team, roles::Vector)
 	roleTypes = []
 	for pair in roles
 		push!(roleTypes, typeof(pair[2]) => pair[1])
 	end
-	currentTeam = getTeams(typeof(team), roleTypes, context)
-	if (team in getTeams(typeof(team), roleTypes, context))
+	currentTeam = getTeams(context, typeof(team), roleTypes)
+	if (team in getTeams(context, typeof(team), roleTypes))
 		error("Team $team is already assigned with the roles $roles")
 	end
 
@@ -532,7 +532,7 @@ function assignRoles(team::T, roles::Vector, context::C) where {T <: Team, C<:Co
 	end
 end
 
-function disassignRoles(team::T, roles::Vector, context::C) where {T <: Team, C<:Context}
+function disassignRoles(context::Context, team::Team, roles::Vector)
 	if !(context in keys(contextManager.teamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
 	end
@@ -571,8 +571,8 @@ function disassignRoles(team::T, roles::Vector, context::C) where {T <: Team, C<
 	end	
 end
 
-function Base.:(>>)(t, mixin::T, context::C) where {T <: Mixin, C<:Context} 
-	assignMixin(t=>mixin, context)
+function Base.:(>>)(context::Context, t, mixin::Mixin)
+	assignMixin(context, t=>mixin)
 end
 
 function Base.:(>>)(t, mixinType::DataType)
@@ -588,26 +588,24 @@ macro context(cname, expr)
 	if typeof(expr) != Expr
 		error("Second argument of @context must be a function or macro call or function definition")
 	else
+		Base.remove_linenums!(expr)
 		if expr.head == :function
 			functionHeaderString = repr(expr.args[1])
-			if endswith(repr(expr.args[1]), "())")
-				functionHeaderString = functionHeaderString[1:end-2] * "context::" * repr(cname)[2:end] * "ContextType))"
-			else
-				functionHeaderString = functionHeaderString[1:end-2] * ", " * "context::" * repr(cname)[2:end] * "ContextType))"
-			end
-			expr.args[1] = eval(Meta.parse(functionHeaderString))
+			ctype = Symbol(cname, :ContextType)
+			arg = :(context::$ctype)
+			insert!(expr.args[1].args, 2, arg)
 			return esc(expr)
 		elseif expr.head == :call
-			push!(expr.args, cname)
+			insert!(expr.args, 2, cname)
 			return esc(expr)
 		elseif expr.head == :.
 			if !(expr.args[1].head == :call)
 				error("Second argument of @context must be a function or macro call or function definition")
 			end
-			push!((expr.args[1]).args, cname)
+			insert!((expr.args[1]).args, 2, cname)
 			return esc(expr)
 		elseif expr.head == :macrocall
-			push!(expr.args, cname)
+			insert!(expr.args, 3, cname)
 			return esc(expr)
 		else
 			error("Second argument of @context must be a function or macro call or function definition")
