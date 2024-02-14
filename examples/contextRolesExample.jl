@@ -71,16 +71,16 @@ end
 # The team is specified by their team-object with the attributes (e.g. Mariage("01.01.2020", "Dresden"))
 # and  the exact role-assignement.
 @context Family assignRoles(Mariage("01.01.2020", "Dresden"),
-							[john=>Husband("test"),
-							jane=>Wife("test")])
+							john=>Husband("test"),
+							jane=>Wife("test"))
 
 @context Family assignRoles(Mariage("01.01.2020", "Dresden"),
-							[jason=>Husband("test"),
-							jordan=>Wife("test")])
+							jason=>Husband("test"),
+							jordan=>Wife("test"))
 
 @context Family assignRoles(Mariage("02.01.2020", "Dresden"),
-							[john=>Husband("test"),
-							jane=>Wife("test")])
+							john=>Husband("test"),
+							jane=>Wife("test"))
 
 # calling this again, would fail since same team with identical roles are alredy assigned:
 # @context Family assignRoles(Mariage("02.01.2020", "Dresden"),
@@ -101,24 +101,24 @@ println("Mariage teams, where John is Husband and Jane if Wife:")
 println(@context Family getTeams(Mariage, [Husband=>john, Wife=>jane]))
 
 @context Family assignRoles(ParentsAndChild(),
-							[john=>Father(),
+							john=>Father(),
 							jane=>Mother(),
-							jake => Child()])
+							jake => Child())
 
 @context Family assignRoles(ParentsAndChild(),
-							[john=>Father(),
+							john=>Father(),
 							jane=>Mother(),
-							jack=>Child()])
+							jack=>Child())
 
 @context Family assignRoles(ParentsAndChild(),
-							[jason=>Father(),
+							jason=>Father(),
 							jordan=>Mother(),
-							john=>Child()])
+							john=>Child())
 
 @context Family assignRoles(ParentsAndChild(),
-							[jim=>Father(),
+							jim=>Father(),
 							julia=>Mother(),
-							jane=>Child()])
+							jane=>Child())
 
 println(getTeams(Family, ParentsAndChild, [Father=>john, Mother=>jane, Child=>jack]))
 

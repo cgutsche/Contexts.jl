@@ -124,6 +124,11 @@ println("John's Family Partner: ", @context Family getPartner(John))
 println("John's Business Partner: ", @context Business getPartner(John))
 println("Jane's Family Partner: ", getPartner(Family, Jane))
 
+println("John's Business Partner: ", isActive(Business) ? (@context Business getPartner(John)) : nothing)
+deactivateContext(Business)
+println("John's Business Partner: ", @context Business getPartner(John))
+println("John's Business Partner: ", isActive(Business) ? (@context Business getPartner(John)) : nothing)
+
 function divorce(p1::Person, p2::Person)
 	@context Family disassignMixin(p1=>Husband)
 	@context Family disassignMixin(p2=>Wife)
@@ -135,5 +140,8 @@ println(" ")
 println("Mixins of John: ", getMixins(John))
 println(" ")
 
-assignMixin(Business, John=>Employer("Test Inc."))
+assignMixin(Business, John=>Employer("Test2 Inc."))
 marry(Jane, Jake, "01.01.2023")
+
+(getMixins(Business, John)[2]).CompanyName = "NewCompany"
+println(getMixins(Business, John)[2])

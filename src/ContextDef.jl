@@ -343,7 +343,7 @@ macro newMixin(context, mixin, attributes)
 	mixin = Symbol(strip((typeMixinList[1])[3:end]))
 	Base.remove_linenums!(attributes)
 
-	newStructExpr = :(struct $mixin <: Mixin
+	newStructExpr = :(mutable struct $mixin <: Mixin
 		$attributes
 	end)
 
@@ -401,7 +401,7 @@ macro newTeam(contextName, teamName, teamContent)
 							 end))
 
 	for (role, attrs) in roles
-		roleDef = :(struct $role <: Role
+		roleDef = :(mutable struct $role <: Role
 			$attrs
 		end)
 		push!(returnExpr.args, roleDef)
@@ -491,10 +491,10 @@ macro assignRoles(context, team, attrs)
 			push!(teamExpr.args, arg)
 		end
 	end
-	return esc(:(assignRoles($context, $teamExpr, [$roleExpr...])))
+	return esc(:(assignRoles($context, $teamExpr, $roleExpr...)))
 end
 
-function assignRoles(context::Context, team::Team, roles::Vector)
+function assignRoles(context::Context, team::Team, roles...)
 	roleTypes = []
 	for pair in roles
 		push!(roleTypes, typeof(pair[2]) => pair[1])
