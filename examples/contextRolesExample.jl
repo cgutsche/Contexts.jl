@@ -29,10 +29,10 @@ joanne = Person("Joanne", 77)
 		placeOfMariage::String
 	end
 	@role Husband << Person begin
-		attr1::String
+		nameAtBirth::String
 	end
 	@role Wife << Person begin
-		attr2::String
+		nameAtBirth::String
 	end
 end
 
@@ -78,11 +78,7 @@ end
 							jason=>Husband("test"),
 							jordan=>Wife("test"))
 
-@context Family assignRoles(Mariage("02.01.2020", "Dresden"),
-							john=>Husband("test"),
-							jane=>Wife("test"))
-
-# calling this again, would fail since same team with identical roles are alredy assigned:
+# calling this again, would fail since team Mariage with identical roles are alredy assigned:
 # @context Family assignRoles(Mariage("02.01.2020", "Dresden"),
 #							[john=>Husband("test"),
 #							jane=>Wife("test")])
@@ -90,15 +86,14 @@ end
 # This will not work, since roles must be assigned together within their team:
 # @context Family john >> Husband("test")
 
-println("Mariage teams, where John is Husband and Jane if Wife:")
-println(getTeams(Family, Mariage, [Husband=>john, Wife=>jane]))
-# Well, maybe a stupid example, since you can not be married twice to the same person at the same time
-# Let's fix this mistake
-# to dissasign roles, you must define the exact team and which objects play which roles
-@context Family disassignRoles(Mariage("02.01.2020", "Dresden"), [john=>Husband, jane=>Wife])
+println("Mariage teams, where Jason is Husband and Jordan is Wife:")
+println(getTeam(Family, Mariage, Husband=>jason, Wife=>jordan))
 
-println("Mariage teams, where John is Husband and Jane if Wife:")
-println(@context Family getTeams(Mariage, [Husband=>john, Wife=>jane]))
+# to dissasign roles, you must define the exact team and which objects play which roles
+@context Family disassignRoles(Mariage, Husband=>jason, Wife=>jordan)
+
+println("Mariage teams, where Jason is Husband and Jordan is Wife:")
+println(@context Family getTeam(Mariage, Husband=>jason, Wife=>jordan))
 
 @context Family assignRoles(ParentsAndChild(),
 							john=>Father(),
@@ -120,15 +115,18 @@ println(@context Family getTeams(Mariage, [Husband=>john, Wife=>jane]))
 							julia=>Mother(),
 							jane=>Child())
 
-println(getTeams(Family, ParentsAndChild, [Father=>john, Mother=>jane, Child=>jack]))
+println(getTeamPartners(Family, john, Father, ParentsAndChild))
 
-println(getRoles(Family, john, Father, ParentsAndChild()))
+println(getTeam(Family, ParentsAndChild, Father=>john, Mother=>jane, Child=>jack))
 
-# jack got adopted 
-@context Family disassignRoles(ParentsAndChild(), [john=>Father, jane=>Mother, jack=>Child])
+println(getRoles(Family, john, Father, ParentsAndChild))
 
-println(getTeams(Family, ParentsAndChild, [Father=>john, Mother=>jane, Child=>jack]))
-println(getTeams(Family, ParentsAndChild, [Father=>john, Mother=>jane, Child=>jake]))
+# jack got adopted by another family
+@context Family disassignRoles(ParentsAndChild, Father=>john, Mother=>jane, Child=>jack)
+
+println(getTeamPartners(Family, john, Father, ParentsAndChild))
+println(getTeam(Family, ParentsAndChild, Father=>john, Mother=>jane, Child=>jack))
+println(getTeam(Family, ParentsAndChild, Father=>john, Mother=>jane, Child=>jake))
 
 # The @assignRoles macro can be used for clearer syntax
 @context Family @assignRoles Mariage begin
@@ -144,47 +142,48 @@ end
 	jordan>> Child()
 end
 
-println(getTeams(Family, Mariage, [Husband=>jim, Wife=>julia]))
+println(getTeam(Family, Mariage, Husband=>jim, Wife=>julia))
 
 # Here are some examples how to use roles in functions:
 
 @context Family function getFamilyTree(p::Person)
 	familyTree = []
-	if !(hasRole(context, p, Child, ParentsAndChild()))
+	if !(hasRole(context, p, Child, ParentsAndChild))
 		return ""
 	end
-	parents = @context Family getTeamPartners(p, Child, ParentsAndChild())
+	parents = (@context Family getTeamPartners(p, Child, ParentsAndChild))[1]
 	"$(p.name) is the child of $(parents[Mother].name) and $(parents[Father].name). " * getFamilyTree(context, parents[Mother]) * (@context context getFamilyTree(parents[Father]))
 end
 
 println(@context Family getFamilyTree(jake))
 
+
+
 @context Family function getMariageDate(p1::Person, p2::Person)
 	if hasRole(context, p1, Husband, Mariage)
-		teams = getTeams(context, Mariage, [Husband=>p1, Wife=>p2])
-		if length(teams) < 1
-			return nothing
-		end
-		return teams[1].dayOfMariage
+		team = getTeam(context, Mariage, Husband=>p1, Wife=>p2)
+		team == nothing ? date = nothing : date = team.dayOfMariage
+		return date
+	elseif hasRole(context, p1, Wife, Mariage)
+		team = getTeam(context, Mariage, Husband=>p2, Wife=>p1)
+		team == nothing ? date = nothing : date = team.dayOfMariage
+		return date
 	else
-		teams = getTeams(context, Mariage, [Husband=>p2, Wife=>p1])[1].dayOfMariage
-		if length(teams) < 1
-			return nothing
-		end
-		return teams[1].dayOfMariage
+		return nothing
 	end
 end
 
 println(@context Family getMariageDate(john, jane))
-println(@context Family getMariageDate(john, julia))
+println(@context Family getMariageDate(julia, jim))
+println(@context Family getMariageDate(julia, john))
 
 @context Family function getPartner(person::Person)
 	partner = nothing
 	if hasRole(context, person, Husband, Mariage) 
-		partner = (@context Family getTeamPartners(person, Husband, Mariage))[Wife]
+		partner = (@context Family getTeamPartners(person, Husband, Mariage))[1][Wife]
 	end
 	if hasRole(context, person, Wife, Mariage)
-		partner = (@context Family getTeamPartners(person, Wife, Mariage))[Husband]
+		partner = (@context Family getTeamPartners(person, Wife, Mariage))[1][Husband]
 	end
 	partner
 end

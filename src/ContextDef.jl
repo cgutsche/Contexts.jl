@@ -224,16 +224,6 @@ function getMixin( context::Context, type, mixin::Type)
 	nothing
 end
 
-function getRoles(context::Context, obj, role::Type, team::Team)
-	roles = []
-	for concreteRole in contextManager.roleDB[obj][context][team]
-		if typeof(concreteRole) == role
-			push!(roles, concreteRole)
-		end
-	end
-	return roles
-end
-
 function hasRole(context::Context, obj, role::Type, team::Team)
 	for concreteRole in getRoles(context, obj, team)
 		if typeof(concreteRole) == role
@@ -244,18 +234,33 @@ function hasRole(context::Context, obj, role::Type, team::Team)
 end
 
 function hasRole(context::Context, obj, roleType::Type, teamType::Type)
+	return length(getRoles(context, obj, roleType, teamType)) != 0
+end
+
+function getRoles(context::Context, obj, role::Type, teamType::Type)
+	roles = []
 	for team in keys(contextManager.roleDB[obj][context])
-		for role in getRoles(context, obj, team)
-			if typeof(role) == roleType
-				return true
+		if typeof(team) == teamType
+			for concreteRole in contextManager.roleDB[obj][context][team]
+				if typeof(concreteRole) == role
+					push!(roles, concreteRole)
+				end
 			end
 		end
 	end
-	false
+	return roles
 end
 
-function getRoles(context::Context, obj, team::Team)
-	return contextManager.roleDB[obj][context][team]
+function getRoles(context::Context, obj, role::Type)
+	roles = []
+	for team in contextManager.roleDB[obj][context]
+		for concreteRole in contextManager.roleDB[obj][context][team]
+			if typeof(concreteRole) == role
+				push!(roles, concreteRole)
+			end
+		end
+	end
+	return roles
 end
 
 function getRoles(context::Context, obj)
@@ -266,18 +271,18 @@ function getRoles(obj)
 	return contextManager.roleDB[obj]
 end
 
-function getTeams(context::Context, teamType::Type, rolePairs::Vector)
+function getTeam(context::Context, teamType::Type, rolePairs...)
 	teams = []
 	if !(context in keys(contextManager.teamDB))
-		return teams
+		return nothing
 	end
 	for (team, rolesObjs ) in contextManager.teamDB[context]
 		roleDict = Dict(rolePairs...)
 		if  roleDict in rolesObjs
-			push!(teams, team)
+			return team
 		end
 	end
-	return teams
+	nothing
 end
 
 function getTeamPartners(context::Context, obj::Any, roleType::Type, team::Team)
@@ -305,18 +310,20 @@ function getTeamPartners(context::Context, obj::Any, roleType::Type, teamType::T
 			push!(groups, (contextManager.teamDB[context][team[1]])...)
 		end
 	end
-	partners = Dict()
+	partners = []
 	for group in groups
 		if roleType in keys(group)
 			if group[roleType] == obj
-				partners = copy(group)
+				push!(partners, copy(group))
 			end
 		end
 	end
-	if roleType in keys(partners) 
-		delete!(partners, roleType)
-	else
-		error("Role $roleType not assigned to $obj for team $teamType in context $context")
+	for partnerGroup in partners
+		if roleType in keys(partnerGroup) 
+			delete!(partnerGroup, roleType)
+		else
+			error("Role $roleType not assigned to $obj for team $teamType in context $context")
+		end
 	end
 	partners
 end
@@ -396,7 +403,7 @@ macro newTeam(contextName, teamName, teamContent)
 		error("Team definition must at least contain two roles")
 	end
 
-	push!(returnExpr.args, :(struct $teamName <: Team 
+	push!(returnExpr.args, :(mutable struct $teamName <: Team 
 							 	$relationalArgExpr
 							 end))
 
@@ -499,9 +506,9 @@ function assignRoles(context::Context, team::Team, roles...)
 	for pair in roles
 		push!(roleTypes, typeof(pair[2]) => pair[1])
 	end
-	currentTeam = getTeams(context, typeof(team), roleTypes)
-	if (team in getTeams(context, typeof(team), roleTypes))
-		error("Team $team is already assigned with the roles $roles")
+	currentTeam = getTeam(context, typeof(team), roleTypes)
+	if (typeof(team) == typeof(getTeam(context, typeof(team), roleTypes)))
+		error("Team $(typeof(team)) is already assigned with the roles $roles")
 	end
 
 	for rolePair in roles
@@ -532,17 +539,18 @@ function assignRoles(context::Context, team::Team, roles...)
 	end
 end
 
-function disassignRoles(context::Context, team::Team, roles::Vector)
+function disassignRoles(context::Context, teamType::Type, roles...)
 	if !(context in keys(contextManager.teamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
 	end
-	if !(team in keys(contextManager.teamDB[context]))
-		error("Team $team is not assigned to context $(context)")
+	if !(teamType in typeof.(keys(contextManager.teamDB[context])))
+		error("Team $teamType is not assigned to context $(context)")
 	end
 	rolesMirrored = []
+	team = getTeam(context, teamType, roles...)
 	for rolePair in roles
-		obj = rolePair[1]
-		role = rolePair[2]
+		role = rolePair[1]
+		obj = rolePair[2]
 		push!(rolesMirrored, role=>obj)
 		if !(obj in keys(contextManager.roleDB))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
@@ -550,7 +558,7 @@ function disassignRoles(context::Context, team::Team, roles::Vector)
 		if !(context in keys(contextManager.roleDB[obj]))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		if !(team in keys(contextManager.roleDB[obj][context]))
+		if !(teamType in typeof.(keys(contextManager.roleDB[obj][context])))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
 		for (i, concreteRole) in enumerate(contextManager.roleDB[obj][context][team])
