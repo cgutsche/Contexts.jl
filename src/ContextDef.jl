@@ -96,7 +96,7 @@ end
 	mixinTypeDB::Dict{Any, Dict{Context, DataType}} = Dict()
 	mixinDB::Dict{Any, Dict{Context, Vector{Any}}} = Dict()
 	teamsAndRoles::Dict{Context, Dict{Any, Dict{DataType, DataType}}} = Dict()
-	roleDB::Dict{Any, Dict{Context, Dict{Any, Vector{Any}}}} = Dict()
+	roleDB::Dict{Any, Dict{Context, Dict{Any, Role}}} = Dict()
 	teamDB::Dict{Context, Dict{Any, Vector{Dict{DataType, Any}}}} = Dict()
 end
 
@@ -224,6 +224,18 @@ function getMixin( context::Context, type, mixin::Type)
 	nothing
 end
 
+function getObjectOfRole(context::Context, role::Role)
+	for obj in keys(contextManager.roleDB)
+		for team in roleDB[obj][context]
+			if contextManager.roleDB[obj][context][team] == role
+				return obj
+			end
+		end
+	end
+	nothing
+end
+
+
 function hasRole(context::Context, obj, role::Type, team::Team)
 	for concreteRole in getRoles(context, obj, team)
 		if typeof(concreteRole) == role
@@ -241,10 +253,9 @@ function getRoles(context::Context, obj, role::Type, teamType::Type)
 	roles = []
 	for team in keys(contextManager.roleDB[obj][context])
 		if typeof(team) == teamType
-			for concreteRole in contextManager.roleDB[obj][context][team]
-				if typeof(concreteRole) == role
-					push!(roles, concreteRole)
-				end
+			concreteRole = contextManager.roleDB[obj][context][team]
+			if typeof(concreteRole) == role
+				push!(roles, concreteRole)
 			end
 		end
 	end
@@ -254,10 +265,9 @@ end
 function getRoles(context::Context, obj, role::Type)
 	roles = []
 	for team in contextManager.roleDB[obj][context]
-		for concreteRole in contextManager.roleDB[obj][context][team]
-			if typeof(concreteRole) == role
-				push!(roles, concreteRole)
-			end
+		concreteRole = contextManager.roleDB[obj][context][team]
+		if typeof(concreteRole) == role
+			push!(roles, concreteRole)
 		end
 	end
 	return roles
@@ -269,6 +279,10 @@ end
 
 function getRoles(obj)
 	return contextManager.roleDB[obj]
+end
+
+function getRoles(context::Context, team::Team)
+	contextManager.teamDB[context][team]
 end
 
 function getTeam(context::Context, teamType::Type, rolePairs...)
@@ -523,10 +537,7 @@ function assignRoles(context::Context, team::Team, roles...)
 		if !(context in keys(contextManager.roleDB[obj]))
 			contextManager.roleDB[obj][context] = Dict()
 		end
-		if !(team in keys(contextManager.roleDB[obj][context]))
-			contextManager.roleDB[obj][context][team] = []
-		end
-		push!(contextManager.roleDB[obj][context][team], role)
+		contextManager.roleDB[obj][context][team] = role
 	end
 
 	if !(context in keys(contextManager.teamDB))
@@ -561,15 +572,16 @@ function disassignRoles(context::Context, teamType::Type, roles...)
 		if !(teamType in typeof.(keys(contextManager.roleDB[obj][context])))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		for (i, concreteRole) in enumerate(contextManager.roleDB[obj][context][team])
-			if typeof(concreteRole) == role
-				deleteat!(contextManager.roleDB[obj][context][team], i)
-				break
-			end
-		end
-		if contextManager.roleDB[obj][context][team] == []
-			delete!(contextManager.roleDB[obj][context], team)
-		end
+		#for (i, concreteRole) in enumerate(contextManager.roleDB[obj][context][team])
+		#	if typeof(concreteRole) == role
+		#		deleteat!(contextManager.roleDB[obj][context][team], i)
+		#		break
+		#	end
+		#end
+		#if contextManager.roleDB[obj][context][team] == []
+		#	delete!(contextManager.roleDB[obj][context], team)
+		#end
+		delete!(contextManager.roleDB[obj][context], team)
 	end
 	for (i, roleGroup) in enumerate(contextManager.teamDB[context][team])
 		if roleGroup == Dict(rolesMirrored...)
