@@ -80,13 +80,11 @@ N_transactions = 10
 players = [Person("Name$i") for i in 1:N_players]
 bank = Bank("DresdenBank", [])
 
-teams = []
 for (i, player) in enumerate(players)
 	@context Banking @assignRoles BankAndCustomer begin
 		player >> Customer(Account(i, 100.00))
 		bank >> AccountProvider()
 	end
-	push!(teams, getTeam(Banking, BankAndCustomer, Customer=>player, AccountProvider=>bank))
 end
 
 

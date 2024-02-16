@@ -572,15 +572,6 @@ function disassignRoles(context::Context, teamType::Type, roles...)
 		if !(teamType in typeof.(keys(contextManager.roleDB[obj][context])))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		#for (i, concreteRole) in enumerate(contextManager.roleDB[obj][context][team])
-		#	if typeof(concreteRole) == role
-		#		deleteat!(contextManager.roleDB[obj][context][team], i)
-		#		break
-		#	end
-		#end
-		#if contextManager.roleDB[obj][context][team] == []
-		#	delete!(contextManager.roleDB[obj][context], team)
-		#end
 		delete!(contextManager.roleDB[obj][context], team)
 	end
 	for (i, roleGroup) in enumerate(contextManager.teamDB[context][team])
@@ -645,6 +636,10 @@ end
 
 
 #### Functions relating to Context Rules ####
+
+function getContextsOfRule(context::Context)
+	[context]
+end
 
 function getContextsOfRule(contextRule::T) where {T <: AbstractContextRule}
 	contexts = []
@@ -759,11 +754,23 @@ function mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
 end
 
 function reduceRuleToElementary(cr::AndContextRule)
-	cr
+	a = reduceRuleToElementary(cr.c1)
+	b = reduceRuleToElementary(cr.c2)
+	if (typeof(a) == OrContextRule) | (typeof(b) == OrContextRule)
+		if (typeof(a) == OrContextRule) & (typeof(b) != OrContextRule)
+			return OrContextRule(reduceRuleToElementary(AndContextRule(a.c1, b)), reduceRuleToElementary(AndContextRule(a.c2, b)))
+		elseif (typeof(a) != OrContextRule) & (typeof(b) == OrContextRule)
+			return OrContextRule(reduceRuleToElementary(AndContextRule(a, b.c1)), reduceRuleToElementary(AndContextRule(a, b.c2)))
+		else
+			return OrContextRule(OrContextRule(reduceRuleToElementary(AndContextRule(a.c1, b.c1)), reduceRuleToElementary(AndContextRule(a.c1, b.c2))),
+								 OrContextRule(reduceRuleToElementary(AndContextRule(a.c2, b.c1)), reduceRuleToElementary(AndContextRule(a.c2, b.c2))))
+		end
+	end
+	AndContextRule(a, b)
 end
 
 function reduceRuleToElementary(cr::OrContextRule)
-	cr
+	OrContextRule(reduceRuleToElementary(cr.c1), reduceRuleToElementary(cr.c2))
 end
 
 function reduceRuleToElementary(c::Context)
@@ -776,10 +783,10 @@ end
 
 function reduceRuleToElementary(cr::NotContextRule)
 	if typeof(cr.c) == AndContextRule
-		return OrContextRule(reduceRuleToElementary(!(cr.c.c1)), reduceRuleToElementary(!(cr.c.c2)))
+		return reduceRuleToElementary(OrContextRule(!(cr.c.c1), !(cr.c.c2)))
 	end
 	if typeof(cr.c) == OrContextRule
-		return AndContextRule(reduceRuleToElementary(!(cr.c.c1)), reduceRuleToElementary(!(cr.c.c2))) 
+		return reduceRuleToElementary(AndContextRule(!(cr.c.c1), !(cr.c.c2)))
 	end
 	if typeof(cr.c) == NotContextRule
 		return reduceRuleToElementary(cr.c.c)
@@ -787,6 +794,89 @@ function reduceRuleToElementary(cr::NotContextRule)
 	if typeof(cr.c) <: Context
 		return cr
 	end
+end
+
+function getCDNF(cr::AbstractContextRule)
+	function removeDoubleTerms(cr::AbstractContextRule)
+		function getAndRules(cr::OrContextRule, l)
+			push!(l, cr.c1)
+			if typeof(cr.c2) == OrContextRule
+				l = getAndRules(cr.c2, l)
+			else
+				push!(l, cr.c2)
+			end
+			l
+		end
+		function genOrRule(l)
+			if length(l) == 1
+				return l[1]
+			end
+			OrContextRule(l[1], genOrRule(l[2:end]))
+		end
+		if typeof(cr) == OrContextRule
+			andRules = getAndRules(cr, [])
+			contexts = getContextsOfRule(andRules[1])
+			c = Dict()
+			for (i, context) in enumerate(contexts)
+				c[context] = i
+			end
+			z = zeros(length(contexts))
+			d = Dict()
+			for a in andRules
+				i = genContextRuleMatrix(a, c, length(contexts))
+				d[i] = a
+			end
+			cr = genOrRule(collect(values(d)))
+		end
+		cr
+	end
+	function addContextToRule(cr::OrContextRule, context::Context)
+		if !(context in getContextsOfRule(cr.c1))
+			newRule_p = AndContextRule(cr.c1, context)
+			newRule_n = AndContextRule(cr.c1, !context)
+			return OrContextRule(newRule_p, OrContextRule(newRule_n, addContextToRule(cr.c2, context)))
+		end
+		OrContextRule(cr.c1, addContextToRule(cr.c2, context))
+	end
+	function addContextToRule(cr::AndContextRule, context::Context)
+		if !(context in getContextsOfRule(cr))
+			newRule_p = AndContextRule(cr, context)
+			newRule_n = AndContextRule(cr, !context)
+			return OrContextRule(newRule_p, newRule_n)
+		end
+		cr
+	end
+	function addContextToRule(cr::NotContextRule, context::Context)
+		if !(context in getContextsOfRule(cr))
+			newRule_p = AndContextRule(cr.c, context)
+			newRule_n = AndContextRule(cr.c, !context)
+			return OrContextRule(newRule_p, newRule_n)
+		end
+		cr
+	end
+	function addContextToRule(cr::Context, context::Context)
+		if !(context in getContextsOfRule(cr))
+			newRule_p = AndContextRule(cr, context)
+			newRule_n = AndContextRule(cr, !context)
+			return OrContextRule(newRule_p, newRule_n)
+		end
+		cr
+	end
+
+	cr = reduceRuleToElementary(cr)
+
+	if (typeof(cr) != OrContextRule)
+		return cr
+	end
+
+	contexts = getContextsOfRule(cr)
+	containedContexts = getContextsOfRule(cr.c1)
+
+	for c in contexts
+		cr = addContextToRule(cr, c)
+	end
+
+	cr = removeDoubleTerms(cr)
 end
 
 function genContextRuleMatrix(cr::T, cdict::Dict, nc::Int) where {T <: Union{Context, Any, AbstractContextRule}}
