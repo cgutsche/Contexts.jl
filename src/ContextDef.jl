@@ -251,6 +251,9 @@ end
 
 function getRoles(context::Context, obj, role::Type, teamType::Type)
 	roles = []
+	if !(obj in keys(contextManager.roleDB))
+		return []
+	end
 	for team in keys(contextManager.roleDB[obj][context])
 		if typeof(team) == teamType
 			concreteRole = contextManager.roleDB[obj][context][team]

@@ -27,7 +27,9 @@ function runPN(pn::CompiledPetriNet)
     nTransitions = size(pn.WeightMatrix_in)[2]
     a = zeros(nContexts)
     for context in getActiveContexts()
-        a[pn.ContextMap[context]] = 1
+        if context in keys(pn.ContextMap)
+            a[pn.ContextMap[context]] = 1
+        end
     end
 
     ContextVector = Vector{Union{<:Context, <:AbstractContextRule}}(undef, nContexts)
@@ -74,7 +76,9 @@ function runPN(pn::CompiledPetriNet, N::Int, activeContexts::AbstractVector=[])
     nTransitions = size(pn.WeightMatrix_in)[2]
     a = zeros(nContexts)
     for context in getActiveContexts()
-        a[pn.ContextMap[context]] = 1
+        if context in keys(pn.ContextMap)
+            a[pn.ContextMap[context]] = 1
+        end
     end
 
     ContextVector = Vector{Union{<:Context, <:AbstractContextRule}}(undef, nContexts)

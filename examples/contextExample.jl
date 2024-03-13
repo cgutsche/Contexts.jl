@@ -145,3 +145,13 @@ marry(Jane, Jake, "01.01.2023")
 
 (getMixins(Business, John)[2]).CompanyName = "NewCompany"
 println(getMixins(Business, John)[2])
+
+getIncome(context::Married.., person::Person)
+	
+end
+
+setIncome(person::Person)
+	if hasRole(Husband) | hasRole(Wife) 
+
+	else
+end
