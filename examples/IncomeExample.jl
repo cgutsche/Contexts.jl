@@ -71,5 +71,5 @@ println()
 
 println("Income of John after second pay rise: ", john.income)
 println("Income of Jane after second pay rise: ", jane.income)
-println("common income after Mariage: ", (getTeam(Family, Mariage, Husband=>john, Wife=>jane)).commonIncome)
+println("common income after second pay rise: ", (getTeam(Family, Mariage, Husband=>john, Wife=>jane)).commonIncome)
 println("Income of Jake after second pay rise: ", jake.income)
