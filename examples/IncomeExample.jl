@@ -14,6 +14,7 @@ end
 	@relationalAttributes begin
 		dayOfMariage::String
 		placeOfMariage::String
+		commonIncome::Float32
 	end
 	@role Husband << Person begin
 		end
@@ -26,12 +27,9 @@ jane = Person("Jane", 42, 3000)
 jake = Person("Jake", 24, 5000)
 
 @context Family function marry(p1::Person, p2::Person)
-	assignRoles(context, Mariage("01.01.2020", "Dresden"),
+	assignRoles(context, Mariage("01.01.2020", "Dresden", p1.income+p2.income),
 						p1=>Husband(),
 						p2=>Wife())
-	commonIncome = p1.income + p2.income
-	p1.income = commonIncome
-	p2.income = commonIncome
 end
 
 @context Family function setIncome(person::Person, newIncome::Number)
@@ -40,7 +38,8 @@ end
 		type = hasRole(context, person, Husband, Mariage) ? Husband : Wife
 		partnerType = type == Husband ? Wife : Husband
 		partner = (getTeamPartners(context, person, type, Mariage))[1][partnerType]
-		partner.income = newIncome
+		mariage = type == Husband ? getTeam(Family, Mariage, Husband=>person, Wife=>partner) : getTeam(Family, Mariage, Husband=>partner, Wife=>person)
+		mariage.commonIncome = person.income + partner.income
 	else
 		person.income = newIncome
 	end
@@ -55,19 +54,22 @@ println()
 
 println("Income of John after Mariage: ", john.income)
 println("Income of Jane after Mariage: ", jane.income)
+println("common income after Mariage: ", (getTeam(Family, Mariage, Husband=>john, Wife=>jane)).commonIncome)
 println("Income of Jake after Mariage: ", jake.income)
 println()
 
-@context Family setIncome(john, 6000)
+@context Family setIncome(john, 3000)
 @context Family setIncome(jake, 5500)
 
 println("Income of John after pay rise: ", john.income)
 println("Income of Jane after pay rise: ", jane.income)
+println("common income after Mariage: ", (getTeam(Family, Mariage, Husband=>john, Wife=>jane)).commonIncome)
 println("Income of Jake after pay rise: ", jake.income)
 println()
 
-@context Family setIncome(jane, 6200)
+@context Family setIncome(jane, 4000)
 
 println("Income of John after second pay rise: ", john.income)
 println("Income of Jane after second pay rise: ", jane.income)
+println("common income after Mariage: ", (getTeam(Family, Mariage, Husband=>john, Wife=>jane)).commonIncome)
 println("Income of Jake after second pay rise: ", jake.income)
