@@ -9,7 +9,7 @@ p3 = Place("p3", 1)
 @newContext C3
 t1 = Transition("t1", C1, [])
 t2 = Transition("t2", C1 & C2, [])
-t3 = Transition("t3", nothing, [Update(C1, off)])
+t3 = Transition("t3", nothing, [C1 => off])
 arcs = [NormalArc(p1, t1, 2, 1), 
 		NormalArc(t1, p2, 1, 1), 
 		NormalArc(p2, t3, 2, 1), 

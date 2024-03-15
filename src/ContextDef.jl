@@ -44,6 +44,10 @@ mutable struct Update
     updateValue::UpdateValue
 end 
 
+function Base.:(=>)(context::Context, updateValue::UpdateValue)
+	Update(context, updateValue)
+end
+
 struct Transition <: PNObject 
     name::String
     contexts::Union{<:Context, Any, <:AbstractContextRule}
