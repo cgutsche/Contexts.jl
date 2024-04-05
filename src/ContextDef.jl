@@ -631,6 +631,34 @@ macro context(cname, expr)
 	end
 end
 
+macro activeContext(cname, expr)
+	if typeof(expr) != Expr
+		error("Second argument of @context must be a function or macro call or function definition")
+	else
+		Base.remove_linenums!(expr)
+		if expr.head == :call
+			insert!(expr.args, 2, cname)
+			ifExpr = quote if isActive($cname)
+					$expr
+				end
+			end
+
+			return esc(ifExpr)
+		elseif expr.head == :.
+			if !(expr.args[1].head == :call)
+				error("Second argument of @context must be a function or macro call")
+			end
+			insert!((expr.args[1]).args, 2, cname)
+			return esc(if isActive(cname) expr end)
+		elseif expr.head == :macrocall
+			insert!(expr.args, 3, cname)
+			return esc(if isActive(cname) expr end)
+		else
+			error("Second argument of @context must be a function or macro call")
+		end
+	end
+end
+
 function isActive(contextRule::T) where {T <: AbstractContextRule}
 	if contextRule isa AndContextRule
 		isActive(contextRule.c1) & isActive(contextRule.c2)

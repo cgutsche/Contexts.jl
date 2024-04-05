@@ -9,7 +9,6 @@ end
 
 @newContext(Family)
 
-
 @context Family @newTeam Mariage begin
 	@relationalAttributes begin
 		dayOfMariage::String
