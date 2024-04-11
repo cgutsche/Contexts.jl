@@ -141,7 +141,6 @@ end
 
 function addContext(context::T) where {T <: Context}
 	push!(contextManager.contexts, eval(context))
-	push!(contextManager.activeContexts, eval(context))
 end
 
 function getActiveContexts()

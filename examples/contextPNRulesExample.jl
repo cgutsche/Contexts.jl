@@ -10,6 +10,10 @@ using .Contexts
 @newContext BatteryEmpty
 @newContext BatteryDischarging
 
+for c in getContexts()
+	activateContext(c)
+end
+
 # Activating BatteryFull will deactivate BatteryCharging
 directedExclusion(BatteryFull => BatteryCharging)
 directedExclusion(BatteryEmpty => BatteryDischarging)

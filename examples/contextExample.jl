@@ -17,6 +17,11 @@ end
 @newContext(Family)
 @newContext University
 
+activateContext(Business)
+activateContext(Volunteering)
+activateContext(Family)
+activateContext(University)
+
 println("Contexts: ", getContexts())
 println("First element is Business: ", getContexts()[1] == Business)
 
@@ -145,13 +150,3 @@ marry(Jane, Jake, "01.01.2023")
 
 (getMixins(Business, John)[2]).CompanyName = "NewCompany"
 println(getMixins(Business, John)[2])
-
-getIncome(context::Married.., person::Person)
-	
-end
-
-setIncome(person::Person)
-	if hasRole(Husband) | hasRole(Wife) 
-
-	else
-end

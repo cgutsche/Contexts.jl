@@ -7,6 +7,9 @@ p3 = Place("p3", 1)
 @newContext C1
 @newContext C2
 @newContext C3
+activateContext(C1)
+activateContext(C2)
+activateContext(C3)
 t1 = Transition("t1", C1, [])
 t2 = Transition("t2", C1 & C2, [])
 t3 = Transition("t3", nothing, [C1 => off])
@@ -34,6 +37,9 @@ println(b)
 @newContext C4
 @newContext C5
 @newContext C6
+activateContext(C4)
+activateContext(C5)
+activateContext(C6)
 println()
 a = C1 & ((C2 & (C3 | C4)) & !(C5 & C6))
 println(a)

@@ -8,6 +8,7 @@ mutable struct Person
 end
 
 @newContext(Family)
+activateContext(Family)
 
 @context Family @newTeam Mariage begin
 	@relationalAttributes begin
@@ -62,7 +63,7 @@ println()
 
 println("Income of John after pay rise: ", john.income)
 println("Income of Jane after pay rise: ", jane.income)
-println("common income after Mariage: ", (getTeam(Family, Mariage, Husband=>john, Wife=>jane)).commonIncome)
+println("common income after pay rise: ", (getTeam(Family, Mariage, Husband=>john, Wife=>jane)).commonIncome)
 println("Income of Jake after pay rise: ", jake.income)
 println()
 

@@ -19,6 +19,7 @@ jonathan = Person("Jonathan", 79)
 joanne = Person("Joanne", 77)
 
 @newContext Family
+activateContext(Family)
 
 # Roles must be defined within Teams because they only exist together with other roles.
 # The Team itself can have attributes, defined with the @relationalAttributes block 
