@@ -71,7 +71,7 @@ function directedExclusion(p::Pair{T1, T2}) where {T1, T2 <: Context}
 	true
 end
 
-function weakInclusion(p::Pair{T1, T2}) where {T1, T2 <: Context}
+function weakInclusion(p::Pair{T1, T2}) where {T1 <: Union{AbstractContextRule, Context}, T2 <: Context}
 	c1 = p[1]
 	c2 = p[2]
 	p1 = Place("p", 0)
@@ -103,7 +103,7 @@ function strongInclusion(p::Pair{T1, T2}) where {T1, T2 <: Context}
 	true
 end
 
-function requirement(p::Pair{T1, T2}) where {T1<: Context, T2 <: Union{AbstractContextRule, Context}}
+function requirement(p::Pair{T1, T2}) where {T1 <: Context, T2 <: Union{AbstractContextRule, Context}}
 	c1 = p[1]
 	c2 = p[2]
 	p1 = Place("p", 0)
