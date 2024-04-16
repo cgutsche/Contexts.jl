@@ -608,7 +608,7 @@ macro context(cname, expr)
 		Base.remove_linenums!(expr)
 		if expr.head == :function
 			functionHeaderString = repr(expr.args[1])
-			ctype = Symbol(cname, :ContextType)
+			ctype = cname == :Any ? Symbol(cname) : Symbol(cname, :ContextType)
 			arg = :(context::$ctype)
 			insert!(expr.args[1].args, 2, arg)
 			return esc(expr)
