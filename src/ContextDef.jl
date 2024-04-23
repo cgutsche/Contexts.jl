@@ -360,7 +360,21 @@ macro newContext(contextName)
 
 		return esc(:($structDefExpr; $SingletonDefExpr; addContext($contextName)))
 	else
-		error("Argument of @newContext must be a String or a Symbol")
+		structDefExpr = quote end
+		SingletonDefExpr = quote end
+		addContextExpr = quote end
+		for cname in contextName.args
+			if typeof(cname) == String
+				cname = Meta.parse(cname)
+			end
+			contextTypeNameSymbol = Symbol(cname, :ContextType)
+
+			push!(structDefExpr.args, :(struct $(contextTypeNameSymbol) <: Context end;))
+			push!(SingletonDefExpr.args, :($(cname) = $contextTypeNameSymbol()))
+			push!(addContextExpr.args, :(addContext($(cname))))
+		end
+		return esc(:($structDefExpr; $SingletonDefExpr; $ addContextExpr))
+		#error("Argument of @newContext must be a String or a Symbol")
 	end
 end
 
@@ -455,7 +469,6 @@ function Base.:(<<)(mixin::DataType, type::DataType)
 	elseif mixin <: Role
 		for entry in values(contextManager.teamsAndRoles)
 			for teamEntry in values(entry)
-				println(teamEntry)
 				for (key, value) in teamEntry
 					if (key == mixin) & (value == type)
 						return true
