@@ -203,6 +203,17 @@ function addTeam(context, team, rolesAndTypes::Dict{DataType, DataType})
 	end
 end
 
+function hasMixin(context::Context, obj, mixin::Type)
+	if obj in keys(contextManager.mixinDB)
+		if context in keys(contextManager.mixinDB[obj])
+			if mixin in [typeof(m) for m in contextManager.mixinDB[obj][context]]
+				return true
+			end
+		end
+	end
+	false
+end
+
 function getMixins()
 	contextManager.mixins
 end
@@ -212,6 +223,9 @@ function getMixins(type)
 end
 
 function getMixins(context::Context, type)
+	if !(type in keys(contextManager.mixinDB))
+		return []
+	end
 	(contextManager.mixinDB[type])[context]
 end
 
@@ -227,17 +241,29 @@ function getMixin( context::Context, type, mixin::Type)
 	nothing
 end
 
-function getObjectOfRole(context::Context, role::Role)
-	for obj in keys(contextManager.roleDB)
-		for team in roleDB[obj][context]
-			if contextManager.roleDB[obj][context][team] == role
-				return obj
+function getObjectsOfMixin( context::Context, mixin::Type)
+	l = []
+	for obj in keys(contextManager.mixinDB)
+		for mixin_i in values(contextManager.mixinDB[obj][context])
+			if typeof(mixin_i) == mixin
+				push!(l, obj)
 			end
 		end
 	end
-	nothing
+	l
 end
 
+function getObjectOfRole(context::Context, team::Type, role::Type)
+	objs = []
+	for obj in keys(contextManager.roleDB)
+		for (team_i, role_i) in contextManager.roleDB[obj][context]
+			if (typeof(role_i) == role) & (typeof(team_i) == team)
+				push!(objs, obj)
+			end
+		end
+	end
+	objs
+end
 
 function hasRole(context::Context, obj, role::Type, team::Team)
 	for concreteRole in getRoles(context, obj, team)
@@ -765,7 +791,6 @@ function mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
     ContextMatrices_merge = vcat(pn1.ContextMatrices, pn2.ContextMatrices)
 
     ContextMap_merge = merge(pn1.ContextMap, pn2.ContextMap)
-    
     if length(pn1.ContextMatrices[1]) != length(pn2.ContextMatrices[1])
         if length(pn1.ContextMatrices[1]) < length(pn2.ContextMatrices[1])
             for i in 1:length(pn1.ContextMatrices)
@@ -773,7 +798,7 @@ function mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
             end
         else
             for i in length(pn1.ContextMatrices)+1:length(pn1.ContextMatrices)+length(pn2.ContextMatrices)
-                ContextMatrices_merge[i] = hcat(pn2.ContextMatrices[i], zeros(size(pn2.ContextMatrices[i])[1], length(ContextMap_merge)-size(pn2.ContextMatrices[i])[2]))
+                ContextMatrices_merge[i] = hcat(pn2.ContextMatrices[i-length(pn1.ContextMatrices)], zeros(size(pn2.ContextMatrices[i-length(pn1.ContextMatrices)])[1], length(ContextMap_merge)-size(pn2.ContextMatrices[i-length(pn1.ContextMatrices)])[2]))
             end
         end
     end

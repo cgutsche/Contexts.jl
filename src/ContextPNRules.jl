@@ -86,13 +86,26 @@ function weakInclusion(p::Pair{T1, T2}) where {T1 <: Union{AbstractContextRule, 
 	true
 end
 
-function strongInclusion(p::Pair{T1, T2}) where {T1, T2 <: Context}
+function strongInclusion(p::Pair{T1, T2}) where {T1 <: Union{OrContextRule, Context}, T2 <: Context}
+	function checkOR(c1::Context) end
+	function checkOR(c1::OrContextRule)
+		if c1 isa OrContextRule
+			checkOR(c1.c1)
+			checkOR(c1.c2)
+		end
+	end
+	function checkOR(c1::AbstractContextRule)
+		error("First element of strongInclusion argument may only include contexts or contexts linked with OR operators.")
+	end
 	c1 = p[1]
 	c2 = p[2]
+
+	checkOR(c1)
+
 	p1 = Place("p", 0)
 	t1 = Transition("activator", c1, [Update(c2, on)])
 	t2 = Transition("deactivator", !c1, [Update(c2, off)])
-	t3 = Transition("deactivator", (!c2)&c1, [Update(c1, off)])
+	t3 = Transition("deactivator", (!c2)&c1, [Update(c, off) for c in getContextsOfRule(c1)])
 	arcs = [NormalArc(t1, p1, 1, 1), 
 			NormalArc(p1, t2, 1, 1), 
 			NormalArc(p1, t3, 1, 1),  
