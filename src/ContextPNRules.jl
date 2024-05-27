@@ -54,6 +54,15 @@ function weakExclusion(c1::T1, c2::T2) where {T1, T2 <: Context}
 	true
 end
 
+function weakExclusion(c1::T1, c2::T2, args...) where {T1, T2 <: Context}
+	contextList::Vector{<:Context} = [c1, c2, args...] 
+	for i in eachindex(contextList)[1:end-1]
+		for j in eachindex(contextList)[i+1:end]
+			weakExclusion(contextList[i], contextList[j])
+		end
+	end
+end
+
 function directedExclusion(p::Pair{T1, T2}) where {T1, T2 <: Context}
 	c1 = p[1]
 	c2 = p[2]

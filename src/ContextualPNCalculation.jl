@@ -71,7 +71,7 @@ function runPN(pn::CompiledPetriNet)
     end
 end
 
-function runPN(pn::CompiledPetriNet, N::Int, activeContexts::AbstractVector=[])
+function runPN(pn::CompiledPetriNet, N::Int)
     nContexts = size(pn.ContextMatrices[1])[2]
     nTransitions = size(pn.WeightMatrix_in)[2]
     a = zeros(nContexts)
@@ -91,7 +91,6 @@ function runPN(pn::CompiledPetriNet, N::Int, activeContexts::AbstractVector=[])
         f_inhibitor = neg(findmax(pn.WeightMatrix_inhibitor .* (T .- pn.WeightMatrix_inhibitor), dims=1)[1])
         f_test = nonNeg(findmin(T .- pn.WeightMatrix_test, dims=1)[1])
         f_context = zeros(1, nTransitions)
-        println(pn.ContextMatrices)
         for i in 1:nTransitions
             h1 = pos(transpose(pn.ContextMatrices[i]))
             h2 = -neg(transpose(pn.ContextMatrices[i]))
@@ -99,9 +98,7 @@ function runPN(pn::CompiledPetriNet, N::Int, activeContexts::AbstractVector=[])
             b2 = (findmax(findmin(h2 .* matrixify(a, size(pn.ContextMatrices[i])[1]), dims=1)[1], dims=2)[1])[1] == 0
             f_context[1, i] = 1 * b1 * b2
         end
-        println("XXX ", f_context)
         f = f_normal .* f_inhibitor .* f_test .* f_context
-        println("YYY ", f)
         c = neg(pn.tokenVector .- pn.WeightMatrix_out * transpose(f))
         while sum(c) > 0
             m = findmax(pn.PrioritiesMatrix, dims=2)[1]
