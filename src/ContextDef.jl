@@ -376,10 +376,12 @@ function getDynamicTeam(context::Context, teamType::Type, id)
 		return nothing
 	end
 	for team in keys(contextManager.dynTeamDB[context])
-		if hasfield(typeof(team), contextManager.dynTeamsIDs[context][teamType])
-			if getfield(team, contextManager.dynTeamsIDs[context][teamType]) == id
-				return team
-			end	
+		if typeof(team) == teamType
+			if hasfield(typeof(team), contextManager.dynTeamsIDs[context][teamType])
+				if getfield(team, contextManager.dynTeamsIDs[context][teamType]) == id
+					return team
+				end	
+			end
 		end
 	end
 	nothing
@@ -755,7 +757,6 @@ end
 function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector, roleDisassignment::Vector)
 	roles = contextManager.dynTeamDB[context][team]
 	teamProps = contextManager.dynTeamsAndData[context][typeof(team)]
-	team = getDynamicTeam(context, teamType, id)
 
 	for (role, curAssigned) in roles
 		min = teamProps[role]["min"]
@@ -784,7 +785,7 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 			contextManager.roleDB[obj][context] = Dict()
 		end
 		contextManager.roleDB[obj][context][team] = role
-		if !(role in keys(contextManager.dynTeamDB[context][team]))
+		if !(typeof(role) in keys(contextManager.dynTeamDB[context][team]))
 			contextManager.dynTeamDB[context][team][typeof(role)] = [obj]
 		else
 			push!(contextManager.dynTeamDB[context][team][typeof(role)], obj)
