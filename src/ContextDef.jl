@@ -284,6 +284,11 @@ function getObjectOfRole(context::Context, team::Type, role::Type)
 	objs
 end
 
+function getObjectsOfRole(context::Context, team::DynamicTeam, role::Type)
+	contextManager.dynTeamDB[context][team][role]
+end
+
+
 function hasRole(context::Context, obj, role::Type, team::Team)
 	for concreteRole in getRoles(context, obj, team)
 		if typeof(concreteRole) == role
@@ -292,6 +297,14 @@ function hasRole(context::Context, obj, role::Type, team::Team)
 	end
 	false
 end
+
+function hasRole(context::Context, obj, role::Type, team::DynamicTeam)
+	if role == typeof(getRole(context, obj, team))
+		return true
+	end
+	false
+end
+
 
 function hasRole(context::Context, obj, roleType::Type, teamType::Type)
 	return length(getRoles(context, obj, roleType, teamType)) != 0
@@ -325,6 +338,15 @@ function getRoles(context::Context, obj, role::Type)
 end
 
 function getRole(context::Context, obj, team::DynamicTeam)
+	if !(obj in keys(contextManager.roleDB))
+		return nothing
+	end
+	if !(context in keys(contextManager.roleDB[obj]))
+		return nothing
+	end
+	if !(team in keys(contextManager.roleDB[obj][context]))
+		return nothing
+	end
 	contextManager.roleDB[obj][context][team]
 end
 
@@ -762,7 +784,7 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 		min = teamProps[role]["min"]
 		max = teamProps[role]["max"]
 		assigned = filter(x -> typeof(x[1]) == role, roleAssignment)
-		disassigned = filter(x -> typeof(x[1]) == role, roleDisassignment)
+		disassigned = filter(x -> x[1] == role, roleDisassignment)
 		if min > length(curAssigned) + length(assigned) - length(disassigned)
 			error("Minimum assigned roles of type $(role) is $(min), current is $(length(curAssigned) + length(assigned) - length(disassigned)).")
 		end
@@ -788,7 +810,11 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 		if !(typeof(role) in keys(contextManager.dynTeamDB[context][team]))
 			contextManager.dynTeamDB[context][team][typeof(role)] = [obj]
 		else
-			push!(contextManager.dynTeamDB[context][team][typeof(role)], obj)
+			if obj in contextManager.dynTeamDB[context][team][typeof(role)]
+				error("$obj already play role $(typeof(role)).")
+			else
+				push!(contextManager.dynTeamDB[context][team][typeof(role)], obj)
+			end	
 		end
 	end
 
@@ -801,14 +827,16 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 				error("Role $(roleObj) plays another role. You must diassign it before dissolving the team.")
 			end
 		end		
-		delete!(contextManager.roleDB[obj][context], team)
-		if contextManager.roleDB[obj][context] == Dict()
-			delete!(contextManager.roleDB[obj], context)
+		if typeof(contextManager.roleDB[obj][context][team]) == role
+			delete!(contextManager.roleDB[obj][context], team)
+			if contextManager.roleDB[obj][context] == Dict()
+				delete!(contextManager.roleDB[obj], context)
+			end
+			if contextManager.roleDB[obj] == Dict()
+				delete!(contextManager.roleDB, obj)
+			end
 		end
-		if contextManager.roleDB[obj] == Dict()
-			delete!(contextManager.roleDB, obj)
-		end
-		filter!(x -> x != obj, contextManager.dynTeamDB[context][team][typeof(role)])
+		filter!(x -> x != obj, contextManager.dynTeamDB[context][team][role])
 	end
 
 end
