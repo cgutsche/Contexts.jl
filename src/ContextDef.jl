@@ -409,6 +409,19 @@ function getDynamicTeam(context::Context, teamType::Type, id)
 	nothing
 end
 
+function getDynamicTeams(context::Context, teamType::Type)
+	if !(context in keys(contextManager.dynTeamDB))
+		return nothing
+	end
+	teams = []
+	for team in keys(contextManager.dynTeamDB[context])
+		if typeof(team) == teamType
+			push!(teams, team)
+		end
+	end
+	teams
+end
+
 function getTeamPartners(context::Context, obj::Any, roleType::Type, team::Team)
 	groups = contextManager.teamDB[context][team]
 	partners = Dict()
