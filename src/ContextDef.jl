@@ -285,6 +285,15 @@ function getObjectOfRole(context::Context, team::Type, role::Type)
 end
 
 function getObjectsOfRole(context::Context, team::DynamicTeam, role::Type)
+	if !(context in keys(contextManager.dynTeamDB))
+		return []
+	end
+	if !(team in keys(contextManager.dynTeamDB[context]))
+		return []
+	end
+	if !(role in keys(contextManager.dynTeamDB[context][team]))
+		return []
+	end
 	contextManager.dynTeamDB[context][team][role]
 end
 
@@ -777,10 +786,10 @@ macro changeRoles(context, team, id, attrs)
 		disassignment = split(distingArray[1], "<<")
 		if length(assignment) > 1
 			assignment = split(repr(arg), ">>")
-			push!(roleAssignmentExpr.args, Meta.parse(assignment[2][1:end-1]*" => "*assignment[1][3:end]))
+			push!(roleAssignmentExpr.args, Meta.parse(assignment[1][3:end]*" => "*assignment[2][1:end-1]))
 		elseif length(disassignment) > 1
 			disassignment = split(repr(arg), "<<")
-			push!(roleDisassignmentExpr.args, Meta.parse(disassignment[2][1:end-1]*" => "*disassignment[1][3:end]))
+			push!(roleDisassignmentExpr.args, Meta.parse(disassignment[1][3:end]*" => "*disassignment[2][1:end-1]))
 		else
 			error("False assignement when changing roles for " , arg)
 		end
@@ -808,8 +817,8 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 	end
 
 	for rolePair in roleAssignment
-		role = rolePair[1]
-		obj = rolePair[2]
+		role = rolePair[2]
+		obj = rolePair[1]
 		if !(typeof(obj) == contextManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"])
 			error("Role $(typeof(role)) can not be assigned to Type $(typeof(obj))")
 		end
@@ -832,8 +841,8 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 	end
 
 	for rolePair in roleDisassignment
-		role = rolePair[1]
-		obj = rolePair[2]
+		role = rolePair[2]
+		obj = rolePair[1]
 		for c in getContexts()
 			roleObj = getRole(c, obj, team)
 			if roleObj in keys(contextManager.roleDB)
