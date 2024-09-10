@@ -106,7 +106,7 @@ end
 	teamDB::Dict{Context, Dict{Any, Vector{Dict{DataType, Any}}}} = Dict()
 	dynTeamDB::Dict{Context, Dict{Any, Dict{DataType, Vector{Any}}}} = Dict()
 	dynTeamsAndData::Dict{Context, Dict{Any, Dict{DataType, Dict}}} = Dict()
-	dynTeamsIDs::Dict{Context, Dict{Any, Any}} = Dict()
+	dynTeamsProp::Dict{Context, Dict{Any, Any}} = Dict()
 end
 
 @with_kw mutable struct ContextControl
@@ -208,17 +208,17 @@ function addTeam(context, team, rolesAndTypes::Dict{DataType, DataType})
 	end
 end
 
-function addDynamicTeam(context::Context, team::DataType, rolesAndData::Dict{DataType, Dict{String, Any}}, id)
+function addDynamicTeam(context::Context, team::DataType, rolesAndData::Dict{DataType, Dict{String, Any}}, id, min, max)
 	if context in keys(contextManager.dynTeamsAndData)
 		if team in keys(contextManager.dynTeamsAndData[context])
 			error("Context already contains team with name")
 		else
 			contextManager.dynTeamsAndData[context][team] = rolesAndData
-			contextManager.dynTeamsIDs[context][team] = id
+			contextManager.dynTeamsProp[context][team] = Dict("ID" => id, "min" => min, "max" => max)
 		end
 	else
 		contextManager.dynTeamsAndData[context] = Dict((team)=>rolesAndData)
-		contextManager.dynTeamsIDs[context] = Dict((team)=>id)
+		contextManager.dynTeamsProp[context] = Dict((team)=>Dict("ID" => id, "min" => min, "max" => max))
 	end
 end
 
@@ -408,11 +408,9 @@ function getDynamicTeam(context::Context, teamType::Type, id)
 	end
 	for team in keys(contextManager.dynTeamDB[context])
 		if typeof(team) == teamType
-			if hasfield(typeof(team), contextManager.dynTeamsIDs[context][teamType])
-				if getfield(team, contextManager.dynTeamsIDs[context][teamType]) == id
-					return team
-				end	
-			end
+			if getfield(team, contextManager.dynTeamsProp[context][teamType]["ID"]) == id
+				return team
+			end	
 		end
 	end
 	nothing
@@ -605,19 +603,25 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 	relationalArgExpr = quote end
 	roles = Dict()
 	rolesAndTypes = Dict()
+	minPlayers = 2
 	maxPlayers = Inf
 	id = nothing
 	for arg in teamContent.args
 		if !(arg.head == :macrocall)
-			error("Block must begin with @relationalAttributes or @roles")
+			error("Block must begin with @IDAttribute, @relationalAttributes, @maxPlayers, @minPlayers or @role")
 		end
 		if arg.args[1] === Symbol("@relationalAttributes")
 			push!(relationalArgExpr.args, ((arg.args[3]).args)...)
+		elseif arg.args[1] === Symbol("@minPlayers")
+			if arg.args[3] < 2
+				error("Minimum Number of Players must be at least 2.")
+			end
+			minPlayers = arg.args[3]
 		elseif arg.args[1] === Symbol("@maxPlayers")
-				maxPlayers = arg.args[3]
+			maxPlayers = arg.args[3]
 		elseif arg.args[1] === Symbol("@IDAttribute")
-				id = arg.args[3]
-				push!(relationalArgExpr.args, id)
+			id = arg.args[3]
+			push!(relationalArgExpr.args, id)
 		elseif arg.args[1] === Symbol("@role")
 			typeRoleList = split(repr(arg.args[3]), "<<")
 			contextualType = Symbol(strip((typeRoleList[2])[1:end-1]))
@@ -642,7 +646,7 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 							   "min" => minRoles,
 							   "max" => maxRoles)
 		else
-			error("Block must begin either with @ID, @maxPlayers, @relationalAttributes or @role")
+			error("Block must begin with @IDAttribute, @relationalAttributes, @maxPlayers, @minPlayers or @role")
 		end
 	end
 
@@ -678,7 +682,7 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 
 	idName = quote  $(Expr(:quote, id.args[1])) end
 
-	push!(returnExpr.args, :(Contexts.addDynamicTeam($contextName, $teamName, $rolesAndDataExpr, $idName)))	
+	push!(returnExpr.args, :(Contexts.addDynamicTeam($contextName, $teamName, $rolesAndDataExpr, $idName, $minPlayers, $maxPlayers)))	
 	return esc(returnExpr)
 end
 
@@ -800,20 +804,29 @@ end
 
 function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector, roleDisassignment::Vector)
 	roles = contextManager.dynTeamDB[context][team]
-	teamProps = contextManager.dynTeamsAndData[context][typeof(team)]
+	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
+	teamProps = contextManager.dynTeamsProp[context][typeof(team)]
 
+	count = 0
 	for (role, curAssigned) in roles
-		min = teamProps[role]["min"]
-		max = teamProps[role]["max"]
-		assigned = filter(x -> typeof(x[1]) == role, roleAssignment)
-		disassigned = filter(x -> x[1] == role, roleDisassignment)
+		min = roleProps[role]["min"]
+		max = roleProps[role]["max"]
+		assigned = filter(x -> typeof(x[2]) == role, roleAssignment)
+		disassigned = filter(x -> x[2] == role, roleDisassignment)
 		if min > length(curAssigned) + length(assigned) - length(disassigned)
 			error("Minimum assigned roles of type $(role) is $(min), current is $(length(curAssigned) + length(assigned) - length(disassigned)).")
 		end
 		if max < length(curAssigned) + length(assigned) - length(disassigned)
 			error("Maximum assigned roles of type $(role) is $(max), current is $(length(curAssigned) + length(assigned) - length(disassigned)).")
 		end
-		# check if max players is exceeded
+		count += length(curAssigned) + length(assigned) - length(disassigned)
+	end
+
+	if teamProps["min"] > count
+		error("Set minimum assigned roles is $(teamProps["max"]), current is $(count).")
+	end
+	if teamProps["max"] < count
+		error("Set maximum assigned roles is $(teamProps["max"]), current is $(count).")
 	end
 
 	for rolePair in roleAssignment
@@ -833,7 +846,7 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 			contextManager.dynTeamDB[context][team][typeof(role)] = [obj]
 		else
 			if obj in contextManager.dynTeamDB[context][team][typeof(role)]
-				error("$obj already play role $(typeof(role)).")
+				error("$obj already plays role $(typeof(role)).")
 			else
 				push!(contextManager.dynTeamDB[context][team][typeof(role)], obj)
 			end	
@@ -929,6 +942,15 @@ function assignRoles(context::Context, team::DynamicTeam, roles...)
 		else
 			roleCnt[type[1]] += length(type[2])
 		end
+	end
+
+	totalCount = sum(values(roleCnt))
+	teamProps = contextManager.dynTeamsProp[context][typeof(team)]
+	if teamProps["min"] > totalCount
+		error("Set minimum assigned roles is $(teamProps["min"]), current is $(totalCount).")
+	end
+	if teamProps["max"] < totalCount
+		error("Set maximum assigned roles is $(teamProps["max"]), current is $(totalCount).")
 	end
 	for (r, c) in roleCnt
 		minimum = contextManager.dynTeamsAndData[context][typeof(team)][r]["min"]
