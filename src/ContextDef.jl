@@ -103,7 +103,7 @@ end
 	mixinDB::Dict{Any, Dict{Context, Vector{Any}}} = Dict()
 	teamsAndRoles::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, DataType}}} = Dict()
 	roleDB::Dict{Any, Dict{Union{Context, Nothing}, Dict{Any, Role}}} = Dict()
-	teamDB::Dict{Context, Dict{Any, Vector{Dict{DataType, Any}}}} = Dict()
+	teamDB::Dict{Union{Context, Nothing}, Dict{Any, Vector{Dict{DataType, Any}}}} = Dict()
 	dynTeamDB::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, Vector{Any}}}} = Dict()
 	dynTeamsAndData::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, Dict}}} = Dict()
 	dynTeamsProp::Dict{Union{Context, Nothing}, Dict{Any, Any}} = Dict()
@@ -196,7 +196,7 @@ function addMixin(context, contextualType, mixinNameSymbol)
 	end
 end
 
-function addTeam(context, team, rolesAndTypes::Dict{DataType, DataType})
+function addTeam(context::Union{Context, Nothing}, team, rolesAndTypes::Dict{DataType, DataType})
 	if context in keys(contextManager.teamsAndRoles)
 		if team in keys(contextManager.teamsAndRoles[context])
 			error("Context already contains team with name")
@@ -260,7 +260,7 @@ function getMixin( context::Context, type, mixin::Type)
 	nothing
 end
 
-function getObjectsOfMixin( context::Context, mixin::Type)
+function getObjectsOfMixin(context::Context, mixin::Type)
 	l = []
 	for obj in keys(contextManager.mixinDB)
 		for mixin_i in values(contextManager.mixinDB[obj][context])
@@ -296,7 +296,9 @@ function getObjectsOfRole(context::Union{Context, Nothing}, team::DynamicTeam, r
 	end
 	contextManager.dynTeamDB[context][team][role]
 end
-
+function getObjectsOfRole(team::DynamicTeam, role::Type)
+	getObjectsOfRole(nothing, team, role)
+end
 
 function hasRole(context::Union{Context, Nothing}, obj, role::Type, team::Team)
 	for concreteRole in getRoles(context, obj, team)
@@ -312,6 +314,10 @@ function hasRole(context::Union{Context, Nothing}, obj, role::Type, team::Dynami
 		return true
 	end
 	false
+end
+
+function hasRole(obj, role::Type, team::DynamicTeam)
+	hasRole(nothing, obj, role, team)
 end
 
 
@@ -359,6 +365,10 @@ function getRole(context::Union{Context, Nothing}, obj, team::DynamicTeam)
 	contextManager.roleDB[obj][context][team]
 end
 
+function getRole(obj, team::DynamicTeam)
+	getRole(nothing, obj, team)
+end
+
 function getRoles(context::Union{Context, Nothing}, obj)
 	return contextManager.roleDB[obj][context]
 end
@@ -373,6 +383,10 @@ end
 
 function getRoles(context::Union{Context, Nothing}, team::DynamicTeam)
 	contextManager.dynTeamDB[context][team]
+end
+
+function getRoles(team::DynamicTeam)
+	contextManager.dynTeamDB[nothing][team]
 end
 
 function getTeam(context::Union{Context, Nothing}, teamType::Type, rolePairs...)
@@ -416,6 +430,10 @@ function getDynamicTeam(context::Union{Context, Nothing}, teamType::Type, id)
 	nothing
 end
 
+function getDynamicTeam(teamType::Type, id)
+	getDynamicTeam(nothing, teamType, id)
+end
+
 function getDynamicTeams(context::Union{Context, Nothing}, teamType::Type)
 	if !(context in keys(contextManager.dynTeamDB))
 		return nothing
@@ -427,6 +445,10 @@ function getDynamicTeams(context::Union{Context, Nothing}, teamType::Type)
 		end
 	end
 	teams
+end
+
+function getDynamicTeams(teamType::Type)
+	getDynamicTeams(nothing, teamType)
 end
 
 function getTeamPartners(context::Union{Context, Nothing}, obj::Any, roleType::Type, team::Team)
@@ -579,6 +601,11 @@ macro newTeam(contextName, teamName, teamContent)
 
 	push!(returnExpr.args, :(addTeam($contextName, $teamName, $rolesAndTypesExpr)))	
 	return esc(returnExpr)
+end
+
+macro newTeam(teamName, teamContent)
+	returnExpr = quote newTeam(nothing, $teamName, $teamContent) end
+	esc(returnExpr)
 end
 
 macro newDynamicTeam(contextName, teamName, teamContent)
