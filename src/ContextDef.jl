@@ -101,12 +101,12 @@ end
 	mixins::Dict{Context, Dict{Any, Vector{DataType}}} = Dict()
 	mixinTypeDB::Dict{Any, Dict{Context, DataType}} = Dict()
 	mixinDB::Dict{Any, Dict{Context, Vector{Any}}} = Dict()
-	teamsAndRoles::Dict{Context, Dict{Any, Dict{DataType, DataType}}} = Dict()
-	roleDB::Dict{Any, Dict{Context, Dict{Any, Role}}} = Dict()
+	teamsAndRoles::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, DataType}}} = Dict()
+	roleDB::Dict{Any, Dict{Union{Context, Nothing}, Dict{Any, Role}}} = Dict()
 	teamDB::Dict{Context, Dict{Any, Vector{Dict{DataType, Any}}}} = Dict()
-	dynTeamDB::Dict{Context, Dict{Any, Dict{DataType, Vector{Any}}}} = Dict()
-	dynTeamsAndData::Dict{Context, Dict{Any, Dict{DataType, Dict}}} = Dict()
-	dynTeamsProp::Dict{Context, Dict{Any, Any}} = Dict()
+	dynTeamDB::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, Vector{Any}}}} = Dict()
+	dynTeamsAndData::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, Dict}}} = Dict()
+	dynTeamsProp::Dict{Union{Context, Nothing}, Dict{Any, Any}} = Dict()
 end
 
 @with_kw mutable struct ContextControl
@@ -208,7 +208,7 @@ function addTeam(context, team, rolesAndTypes::Dict{DataType, DataType})
 	end
 end
 
-function addDynamicTeam(context::Context, team::DataType, rolesAndData::Dict{DataType, Dict{String, Any}}, id, min, max)
+function addDynamicTeam(context::Union{Context, Nothing}, team::DataType, rolesAndData::Dict{DataType, Dict{String, Any}}, id, min, max)
 	if context in keys(contextManager.dynTeamsAndData)
 		if team in keys(contextManager.dynTeamsAndData[context])
 			error("Context already contains team with name")
@@ -272,7 +272,7 @@ function getObjectsOfMixin( context::Context, mixin::Type)
 	l
 end
 
-function getObjectOfRole(context::Context, team::Type, role::Type)
+function getObjectOfRole(context::Union{Context, Nothing}, team::Type, role::Type)
 	objs = []
 	for obj in keys(contextManager.roleDB)
 		for (team_i, role_i) in contextManager.roleDB[obj][context]
@@ -284,7 +284,7 @@ function getObjectOfRole(context::Context, team::Type, role::Type)
 	objs
 end
 
-function getObjectsOfRole(context::Context, team::DynamicTeam, role::Type)
+function getObjectsOfRole(context::Union{Context, Nothing}, team::DynamicTeam, role::Type)
 	if !(context in keys(contextManager.dynTeamDB))
 		return []
 	end
@@ -298,7 +298,7 @@ function getObjectsOfRole(context::Context, team::DynamicTeam, role::Type)
 end
 
 
-function hasRole(context::Context, obj, role::Type, team::Team)
+function hasRole(context::Union{Context, Nothing}, obj, role::Type, team::Team)
 	for concreteRole in getRoles(context, obj, team)
 		if typeof(concreteRole) == role
 			return true
@@ -307,7 +307,7 @@ function hasRole(context::Context, obj, role::Type, team::Team)
 	false
 end
 
-function hasRole(context::Context, obj, role::Type, team::DynamicTeam)
+function hasRole(context::Union{Context, Nothing}, obj, role::Type, team::DynamicTeam)
 	if role == typeof(getRole(context, obj, team))
 		return true
 	end
@@ -315,11 +315,11 @@ function hasRole(context::Context, obj, role::Type, team::DynamicTeam)
 end
 
 
-function hasRole(context::Context, obj, roleType::Type, teamType::Type)
+function hasRole(context::Union{Context, Nothing}, obj, roleType::Type, teamType::Type)
 	return length(getRoles(context, obj, roleType, teamType)) != 0
 end
 
-function getRoles(context::Context, obj, role::Type, teamType::Type)
+function getRoles(context::Union{Context, Nothing}, obj, role::Type, teamType::Type)
 	roles = []
 	if !(obj in keys(contextManager.roleDB))
 		return []
@@ -335,7 +335,7 @@ function getRoles(context::Context, obj, role::Type, teamType::Type)
 	return roles
 end
 
-function getRoles(context::Context, obj, role::Type)
+function getRoles(context::Union{Context, Nothing}, obj, role::Type)
 	roles = []
 	for team in contextManager.roleDB[obj][context]
 		concreteRole = contextManager.roleDB[obj][context][team]
@@ -346,7 +346,7 @@ function getRoles(context::Context, obj, role::Type)
 	return roles
 end
 
-function getRole(context::Context, obj, team::DynamicTeam)
+function getRole(context::Union{Context, Nothing}, obj, team::DynamicTeam)
 	if !(obj in keys(contextManager.roleDB))
 		return nothing
 	end
@@ -359,7 +359,7 @@ function getRole(context::Context, obj, team::DynamicTeam)
 	contextManager.roleDB[obj][context][team]
 end
 
-function getRoles(context::Context, obj)
+function getRoles(context::Union{Context, Nothing}, obj)
 	return contextManager.roleDB[obj][context]
 end
 
@@ -367,15 +367,15 @@ function getRoles(obj)
 	return contextManager.roleDB[obj]
 end
 
-function getRoles(context::Context, team::Team)
+function getRoles(context::Union{Context, Nothing}, team::Team)
 	contextManager.teamDB[context][team]
 end
 
-function getRoles(context::Context, team::DynamicTeam)
+function getRoles(context::Union{Context, Nothing}, team::DynamicTeam)
 	contextManager.dynTeamDB[context][team]
 end
 
-function getTeam(context::Context, teamType::Type, rolePairs...)
+function getTeam(context::Union{Context, Nothing}, teamType::Type, rolePairs...)
 	teams = []
 	if !(context in keys(contextManager.teamDB))
 		return nothing
@@ -389,7 +389,7 @@ function getTeam(context::Context, teamType::Type, rolePairs...)
 	nothing
 end
 
-function getDynamicTeam(context::Context, teamType::Type, rolePairs::Pair...)
+function getDynamicTeam(context::Union{Context, Nothing}, teamType::Type, rolePairs::Pair...)
 	if !(context in keys(contextManager.dynTeamDB))
 		return nothing
 	end
@@ -402,7 +402,7 @@ function getDynamicTeam(context::Context, teamType::Type, rolePairs::Pair...)
 	nothing
 end
 
-function getDynamicTeam(context::Context, teamType::Type, id)
+function getDynamicTeam(context::Union{Context, Nothing}, teamType::Type, id)
 	if !(context in keys(contextManager.dynTeamDB))
 		return nothing
 	end
@@ -416,7 +416,7 @@ function getDynamicTeam(context::Context, teamType::Type, id)
 	nothing
 end
 
-function getDynamicTeams(context::Context, teamType::Type)
+function getDynamicTeams(context::Union{Context, Nothing}, teamType::Type)
 	if !(context in keys(contextManager.dynTeamDB))
 		return nothing
 	end
@@ -429,7 +429,7 @@ function getDynamicTeams(context::Context, teamType::Type)
 	teams
 end
 
-function getTeamPartners(context::Context, obj::Any, roleType::Type, team::Team)
+function getTeamPartners(context::Union{Context, Nothing}, obj::Any, roleType::Type, team::Team)
 	groups = contextManager.teamDB[context][team]
 	partners = Dict()
 	for group in groups
@@ -447,7 +447,7 @@ function getTeamPartners(context::Context, obj::Any, roleType::Type, team::Team)
 	partners
 end
 
-function getTeamPartners(context::Context, obj::Any, roleType::Type, teamType::Type)
+function getTeamPartners(context::Union{Context, Nothing}, obj::Any, roleType::Type, teamType::Type)
 	groups = []
 	for team in contextManager.teamDB[context]
 		if typeof(team[1]) == teamType
@@ -587,14 +587,14 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 			contextName = Meta.parse(contextName)
 		end
 	else
-		error("Last argument must be a String or a Symbol")
+		error("Context name argument must be a String or a Symbol")
 	end
 	if typeof(teamName) == String || typeof(teamName) == Symbol
 		if typeof(teamName) == String
 			teamName = Meta.parse(teamName)
 		end
 	else
-		error("First argument must be a String or a Symbol")
+		error("Team Name argument must be a String or a Symbol")
 	end
 
 	returnExpr = quote end
@@ -686,6 +686,11 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 	return esc(returnExpr)
 end
 
+macro newDynamicTeam(teamName, teamContent)
+	returnExpr = quote @newDynamicTeam(nothing, $teamName, $teamContent) end
+	esc(returnExpr)
+end
+
 function Base.:(<<)(mixin::DataType, type::DataType)
 	if mixin <: Mixin
 		for entry in values(contextManager.mixins)
@@ -763,6 +768,23 @@ macro assignRoles(context, team, attrs)
 	return esc(:(assignRoles($context, $teamExpr, $roleExpr...)))
 end
 
+macro assignRoles(team, attrs)
+	teamExpr = :($team())
+	roleExpr = :()
+	Base.remove_linenums!(attrs)
+	for arg in attrs.args
+		distingArray = split(repr(arg), "=")
+		assignment = split(distingArray[1], ">>")
+		if length(assignment) > 1
+			assignment = split(repr(arg), ">>")
+			push!(roleExpr.args, Meta.parse(assignment[1][3:end]*" => "*assignment[2][1:end-1]))
+		else
+			push!(teamExpr.args, arg)
+		end
+	end
+	return esc(:(assignRoles(nothing, $teamExpr, $roleExpr...)))
+end
+
 macro disassignRoles(context, team, attrs)
 	teamExpr = :($team())
 	roleExpr = :()
@@ -778,6 +800,23 @@ macro disassignRoles(context, team, attrs)
 		end
 	end
 	return esc(:(disassignRoles($context, $teamExpr, $roleExpr...)))
+end
+
+macro disassignRoles(team, attrs)
+	teamExpr = :($team())
+	roleExpr = :()
+	Base.remove_linenums!(attrs)
+	for arg in attrs.args
+		distingArray = split(repr(arg), "=")
+		assignment = split(distingArray[1], ">>")
+		if length(assignment) > 1
+			assignment = split(repr(arg), ">>")
+			push!(roleExpr.args, Meta.parse(assignment[2][1:end-1]*" => "*assignment[1][3:end]))
+		else
+			push!(teamExpr.args, arg)
+		end
+	end
+	return esc(:(disassignRoles(nothing, $teamExpr, $roleExpr...)))
 end
 
 macro changeRoles(context, team, id, attrs)
@@ -802,7 +841,29 @@ macro changeRoles(context, team, id, attrs)
 	return esc(:(changeRoles($context, $teamObject, $roleAssignmentExpr, $roleDisassignmentExpr)))
 end
 
-function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector, roleDisassignment::Vector)
+macro changeRoles(team, id, attrs)
+	roleAssignmentExpr = :([])
+	roleDisassignmentExpr = :([])
+	Base.remove_linenums!(attrs)
+	for arg in attrs.args
+		distingArray = split(repr(arg), "=")
+		assignment = split(distingArray[1], ">>")
+		disassignment = split(distingArray[1], "<<")
+		if length(assignment) > 1
+			assignment = split(repr(arg), ">>")
+			push!(roleAssignmentExpr.args, Meta.parse(assignment[1][3:end]*" => "*assignment[2][1:end-1]))
+		elseif length(disassignment) > 1
+			disassignment = split(repr(arg), "<<")
+			push!(roleDisassignmentExpr.args, Meta.parse(disassignment[1][3:end]*" => "*disassignment[2][1:end-1]))
+		else
+			error("False assignement when changing roles for " , arg)
+		end
+	end
+	teamObject = :(getDynamicTeam(nothing, $team, $id))
+	return esc(:(changeRoles(nothing, $teamObject, $roleAssignmentExpr, $roleDisassignmentExpr)))
+end
+
+function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector, roleDisassignment::Vector)
 	roles = contextManager.dynTeamDB[context][team]
 	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
 	teamProps = contextManager.dynTeamsProp[context][typeof(team)]
@@ -876,7 +937,7 @@ function changeRoles(context::Context, team::DynamicTeam, roleAssignment::Vector
 
 end
 
-function assignRoles(context::Context, team::Team, roles...)
+function assignRoles(context::Union{Context, Nothing}, team::Team, roles...)
 	roleTypes = []
 	for pair in roles
 		push!(roleTypes, typeof(pair[2]) => pair[1])
@@ -922,7 +983,7 @@ function assignRoles(context::Context, team::Team, roles...)
 	end
 end
 
-function assignRoles(context::Context, team::DynamicTeam, roles...)
+function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles...)
 	roleTypes = Dict()
 	for pair in roles
 		if typeof(pair[2]) in keys(roleTypes)
@@ -985,7 +1046,7 @@ function assignRoles(context::Context, team::DynamicTeam, roles...)
 	end
 end
 
-function disassignRoles(context::Context, t::Team, roles::Pair...)
+function disassignRoles(context::Union{Context, Nothing}, t::Team, roles::Pair...)
 	teamType = typeof(t)
 	if !(context in keys(contextManager.teamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
@@ -1018,7 +1079,7 @@ function disassignRoles(context::Context, t::Team, roles::Pair...)
 	end	
 end
 
-function disassignRoles(context::Context, teamType::Type, roles::Pair...)
+function disassignRoles(context::Union{Context, Nothing}, teamType::Type, roles::Pair...)
 	if !(context in keys(contextManager.teamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
 	end
@@ -1050,7 +1111,7 @@ function disassignRoles(context::Context, teamType::Type, roles::Pair...)
 	end	
 end
 
-function disassignRoles(context::Context, teamType::Type, id)
+function disassignRoles(context::Union{Context, Nothing}, teamType::Type, id)
 	if !(context in keys(contextManager.dynTeamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
 	end
