@@ -284,6 +284,19 @@ function getObjectOfRole(context::Union{Context, Nothing}, team::Type, role::Typ
 	objs
 end
 
+function getObjectOfRole(context::Union{Context, Nothing}, team::DynamicTeam, role::Role)
+	for obj in keys(contextManager.roleDB)
+		if context in keys(roleDB[obj])
+			if contextManager.roleDB[obj][context][team] == role
+					return obj
+			end
+		end
+	end
+end
+function getObjectOfRole(team::DynamicTeam, role::Role)
+	getObjectOfRole(nothing, team, role)
+end
+
 function getObjectsOfRole(context::Union{Context, Nothing}, team::DynamicTeam, role::Type)
 	if !(context in keys(contextManager.dynTeamDB))
 		return []
