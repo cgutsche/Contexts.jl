@@ -460,6 +460,14 @@ function getDynamicTeam(role::Role)
 	getDynamicTeam(nothing, role)
 end
 
+function getDynamicTeamID(context::Union{Context, Nothing}, team::DynamicTeam)
+	contextManager.dynTeamsProp[context][team]
+end
+
+function getDynamicTeamID(team::DynamicTeam)
+	contextManager.dynTeamsProp[nothing][team]
+end
+
 function getDynamicTeam(context::Union{Context, Nothing}, teamType::DataType, id::T) where T
 	d = get!(contextManager.dynTeamDB, context, Dict())
 	idName = contextManager.dynTeamsProp[context][teamType]["ID"]
