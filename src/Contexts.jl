@@ -9,7 +9,7 @@ include("ContextualPNCalculation.jl")
 export runPN
 
 include("ContextPNRules.jl")
-export exclusion, weakExclusion, directedExclusion, strongInclusion, weakInclusion, requirement
+export exclusion, weakExclusion, directedExclusion, strongInclusion, weakInclusion, requirement, alternative
 
 
 end
