@@ -1,5 +1,6 @@
 using Test
-using Contexts
+include("../src/Contexts.jl")
+using .Contexts
 
 @testset "Context Basics" begin
     # Test context creation and management
@@ -19,7 +20,7 @@ using Contexts
     end
 
     @testset "Multiple Contexts" begin
-        @newContext("Context1", "Context2")
+        @newContext Context1, Context2
         @test Context1 in getContexts()
         @test Context2 in getContexts()
     end

@@ -1,6 +1,3 @@
-using Test
-using Contexts
-
 @testset "Petri Nets" begin
     @testset "Basic Petri Net Operations" begin
         # Create places
@@ -12,8 +9,8 @@ using Contexts
         t1 = Transition("t1", PNContext, [PNContext=>on])
         
         # Create arcs
-        a1 = NormalArc(from=p1, to=t1, weight=1.0)
-        a2 = NormalArc(from=t1, to=p2, weight=1.0)
+        a1 = NormalArc(from=p1, to=t1, weight=1.0, priority=1)
+        a2 = NormalArc(from=t1, to=p2, weight=1.0, priority=1)
         
         # Create Petri net
         pn = PetriNet(

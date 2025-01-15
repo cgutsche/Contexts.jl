@@ -1,6 +1,3 @@
-using Test
-using Contexts
-
 @testset "Mixins" begin
     @newContext MixinContext
 
@@ -15,8 +12,7 @@ using Contexts
         
         # Test mixin assignment
         obj = 42
-        mixin = TestMixin(value=100)
-        MixinContext >> (obj => mixin)
+        @context MixinContext obj >> TestMixin(100)
         
         @test hasMixin(MixinContext, obj, TestMixin)
         @test getMixin(MixinContext, obj, TestMixin).value == 100
@@ -25,7 +21,7 @@ using Contexts
         @test obj in getObjectsOfMixin(MixinContext, TestMixin)
         
         # Test mixin disassignment
-        disassignMixin(MixinContext, obj=>mixin)
+        disassignMixin(MixinContext, obj=>TestMixin)
         @test !hasMixin(MixinContext, obj, TestMixin)
     end
 end 

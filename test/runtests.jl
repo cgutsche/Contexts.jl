@@ -1,7 +1,3 @@
-using Test
-include("../src/Contexts.jl")
-using .Contexts
-
 # Include specific test files
 include("test_context_basics.jl")
 include("test_context_rules.jl")

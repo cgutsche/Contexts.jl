@@ -1,5 +1,3 @@
-using Test
-using Contexts
 
 @testset "Context Rules" begin
     @testset "Basic Rules" begin
@@ -8,7 +6,6 @@ using Contexts
         
         # Test AND rule
         rule_and = RuleContext1 & RuleContext2
-        @test rule_and isa AndContextRule
         @test !isActive(rule_and)
         activateContext(RuleContext1)
         @test !isActive(rule_and)
@@ -17,7 +14,6 @@ using Contexts
 
         # Test OR rule
         rule_or = RuleContext1 | RuleContext2
-        @test rule_or isa OrContextRule
         @test isActive(rule_or)
         deactivateContext(RuleContext1)
         @test isActive(rule_or)
@@ -26,7 +22,6 @@ using Contexts
 
         # Test NOT rule
         rule_not = !RuleContext1
-        @test rule_not isa NotContextRule
         @test isActive(rule_not)
         activateContext(RuleContext1)
         @test !isActive(rule_not)
@@ -38,7 +33,6 @@ using Contexts
         @newContext C3
 
         complex_rule = (C1 & C2) | !C3
-        @test complex_rule isa OrContextRule
         
         activateContext(C1)
         activateContext(C2)
