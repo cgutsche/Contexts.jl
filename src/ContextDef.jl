@@ -12,6 +12,10 @@ abstract type DynamicTeam end
 
 abstract type Context end
 
+struct ContextGroup
+	subContexts::Vector{Context}
+end
+
 #### Context rule (condition) regarded type definitions ####
 
 abstract type AbstractContextRule end
@@ -139,6 +143,12 @@ function addPNToControlPN(pn::PetriNet)
 	contextControler.contextPN.arcs == [] ? contextControler.contextPN.arcs = pn.arcs : push!(contextControler.contextPN.arcs, pn.arcs...)
 	contextControler.contextPNcompiled = mergeCompiledPetriNets(contextControler.contextPNcompiled, cpn)
 end
+
+function ContextGroup(subContexts::Context...)
+	alternative(subContexts...)
+	ContextGroup([subContexts...])
+end
+(contextGroup::ContextGroup)() = filter(subContext -> isActive(subContext), contextGroup.subContexts)[1]
 
 function getContexts()
 	contextManager.contexts
@@ -300,7 +310,7 @@ end
 function getObjectOfRole(context::Union{Context, Nothing}, role::Role)
 	for obj in keys(contextManager.roleDB)
 		if context in keys(contextManager.roleDB[obj])
-			for (team, role_i) in values(contextManager.roleDB[obj][context])
+			for role_i in values(contextManager.roleDB[obj][context])
 				if role_i == role
 					return obj
 				end
@@ -447,7 +457,7 @@ function getDynamicTeam(context::Union{Context, Nothing}, role::Role)
 		return nothing
 	end
 	for obj in keys(contextManager.roleDB)
-		for team in keys(contextManager.roleDB)
+		for team in keys(contextManager.roleDB[obj][context])
 			if contextManager.roleDB[obj][context][team] == role
 				return team
 			end
