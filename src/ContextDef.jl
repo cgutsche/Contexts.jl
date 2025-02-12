@@ -451,19 +451,6 @@ function getTeam(context::Union{Context, Nothing}, teamType::Type, rolePairs...)
 	nothing
 end
 
-function getDynamicTeam(context::Union{Context, Nothing}, teamType::Type, rolePairs::Pair...)
-	if !(context in keys(contextManager.dynTeamDB))
-		return nothing
-	end
-	for (team, rolesObjs) in contextManager.dynTeamDB[context]
-		roleDict = Dict(rolePairs...)
-		if roleDict in values(rolesObjs)
-			return team
-		end
-	end
-	nothing
-end
-
 function getDynamicTeam(context::Union{Context, Nothing}, role::Role)
 	if !(context in keys(contextManager.dynTeamDB))
 		return nothing
@@ -611,19 +598,27 @@ macro newMixin(context, mixin, attributes)
 end
 
 macro newTeam(contextName, teamName, teamContent)
+	teamSuperType = :Team
 	if typeof(contextName) == String || typeof(contextName) == Symbol
 		if typeof(contextName) == String
 			contextName = Meta.parse(contextName)
 		end
 	else
-		error("Last argument must be a String or a Symbol")
+		error("Context argument must be a String or a Symbol")
 	end
 	if typeof(teamName) == String || typeof(teamName) == Symbol
 		if typeof(teamName) == String
 			teamName = Meta.parse(teamName)
 		end
+	elseif typeof(teamName) == Expr
+		if teamName.head == :(<:)
+			teamSuperType = teamName.args[2]
+			teamName = teamName.args[1]
+		else
+			error("Supertyping of Teams must be done with <:")
+		end
 	else
-		error("First argument must be a String or a Symbol")
+		error("Team argument must be a String or a Symbol")
 	end
 
 	returnExpr = quote end
@@ -632,6 +627,7 @@ macro newTeam(contextName, teamName, teamContent)
 	relationalArgExpr = quote end
 	roles = Dict()
 	rolesAndTypes = Dict()
+	supertypes = Dict()
 	for arg in teamContent.args
 		if !(arg.head == :macrocall)
 			error("Block must begin with @relationalAttributes or @roles")
@@ -639,14 +635,26 @@ macro newTeam(contextName, teamName, teamContent)
 		if arg.args[1] === Symbol("@relationalAttributes")
 			push!(relationalArgExpr.args, ((arg.args[3]).args)...)
 		elseif arg.args[1] === Symbol("@role")
-			typeRoleList = split(repr(arg.args[3]), "<<")
-			contextualType = Symbol(strip((typeRoleList[2])[1:end-1]))
-			role = Symbol(strip((typeRoleList[1])[3:end]))
+			if arg.args[3].head == :(<:)
+				if arg.args[3].args[1].args[1] != :(<<)
+					error("Type of objects that can play a role must be specified by <<")
+				end
+				role = arg.args[3].args[1].args[2]
+				contextualType = arg.args[3].args[1].args[3]
+				roleSuperType = arg.args[3].args[2]
+			elseif (length(arg.args[3].args) == 3) & (arg.args[3].args[1] == :(<<))
+				role = arg.args[3].args[2]
+				contextualType = arg.args[3].args[3]
+				roleSuperType = :Role
+			else
+				error("Syntax error.")
+			end
 			if role in keys(roles)
 				error("Role names of team must be unique")
 			end
 			roles[role] = arg.args[4]
 			rolesAndTypes[role] = contextualType
+			supertypes[role] = roleSuperType
 		else
 			error("Block must begin with @relationalAttributes or @roles")
 		end
@@ -656,14 +664,22 @@ macro newTeam(contextName, teamName, teamContent)
 		error("Team definition must at least contain two roles")
 	end
 
-	push!(returnExpr.args, :(mutable struct $teamName <: Team 
-							 	$relationalArgExpr
-							 end))
+	push!(returnExpr.args, quote mutable struct $teamName <: $(teamSuperType)
+							 	     $relationalArgExpr
+							     end
+								 if !($(teamSuperType) <: Team)
+									error("Supertype of Teams must be Team or a subtype of Team but ", $(teamSuperType), " (Supertype of ", $teamName, ") is not.")
+								end
+							end)
 
 	for (role, attrs) in roles
-		roleDef = :(mutable struct $role <: Role
-			$attrs
-		end)
+		roleDef = quote mutable struct $role <: $(supertypes[role])
+				$attrs
+			end
+			if !($(supertypes[role]) <: Role)
+				error("Supertype of concrete roles must be Role or a subtype of Role but ", $(supertypes[role]), " (Supertype of ", $role, ") is not.")
+			end
+		end
 		push!(returnExpr.args, roleDef)
 	end
 
@@ -682,19 +698,27 @@ macro newTeam(teamName, teamContent)
 end
 
 macro newDynamicTeam(contextName, teamName, teamContent)
+	teamSuperType = :DynamicTeam
 	if typeof(contextName) == String || typeof(contextName) == Symbol
 		if typeof(contextName) == String
 			contextName = Meta.parse(contextName)
 		end
 	else
-		error("Context name argument must be a String or a Symbol")
+		error("Context argument must be a String or a Symbol")
 	end
 	if typeof(teamName) == String || typeof(teamName) == Symbol
 		if typeof(teamName) == String
 			teamName = Meta.parse(teamName)
 		end
+	elseif typeof(teamName) == Expr
+		if teamName.head == :(<:)
+			teamSuperType = teamName.args[2]
+			teamName = teamName.args[1]
+		else
+			error("Supertyping of Teams must be done with <:")
+		end
 	else
-		error("Team Name argument must be a String or a Symbol")
+		error("Team argument must be a String or a Symbol")
 	end
 
 	returnExpr = quote end
@@ -702,7 +726,7 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 	Base.remove_linenums!(teamContent)
 	relationalArgExpr = quote end
 	roles = Dict()
-	rolesAndTypes = Dict()
+	supertypes = Dict()
 	minPlayers = 2
 	maxPlayers = Inf
 	id = nothing
@@ -723,9 +747,25 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 			id = arg.args[3]
 			push!(relationalArgExpr.args, id)
 		elseif arg.args[1] === Symbol("@role")
-			typeRoleList = split(repr(arg.args[3]), "<<")
-			contextualType = Symbol(strip((typeRoleList[2])[1:end-1]))
 			cardinalityList = split(repr(arg.args[4]), "..")
+			if length(arg.args[3].args) == 2
+				if arg.args[3].args[1].args[1] != :(<<)
+					error("Type of objects that can play a role must be specified by <<")
+				end
+				role = arg.args[3].args[1].args[2]
+				contextualType = arg.args[3].args[1].args[3]
+				roleSuperType = arg.args[3].args[2]
+			elseif (length(arg.args[3].args) == 3) & (arg.args[3].args[1] == :(<<))
+				role = arg.args[3].args[2]
+				contextualType = arg.args[3].args[3]
+				roleSuperType = :Role
+			else
+				error("Syntax error.")
+			end
+			if role in keys(roles)
+				error("Role names of team must be unique")
+			end
+			supertypes[role] = roleSuperType
 			if length(cardinalityList) > 1
 				minRoles = cardinalityList[1][4:end]
 				maxRoles = cardinalityList[2][1:end-2]
@@ -737,7 +777,6 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 			if minRoles < 0 error("Cardinality of Role can not be negative!") end
 			maxRoles = occursin("Inf", maxRoles) ? parse(Float64, maxRoles) : parse(Int64, maxRoles)
 			if minRoles > maxRoles error("Minimum cardinality must be smaller than maximum!") end
-			role = Symbol(strip((typeRoleList[1])[3:end]))
 			if role in keys(roles)
 				error("Role names of team must be unique")
 			end
@@ -760,15 +799,23 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 		end
 	end
 
-	push!(returnExpr.args, :(mutable struct $teamName <: DynamicTeam 
-							 	$relationalArgExpr
-							 end))
+	push!(returnExpr.args, quote mutable struct $teamName <: $(teamSuperType)
+							 	     $relationalArgExpr
+							     end
+								 if !($(teamSuperType) <: DynamicTeam)
+									error("Supertype of DynamicTeams must be DynamicTeam or a subtype of DynamicTeam but ", $(teamSuperType), " (Supertype of ", $teamName, ") is not.")
+								end
+							end)
 
 	for role in keys(roles)
 		attrs = roles[role]["attrs"]
-		roleDef = :(mutable struct $role <: Role
-			$attrs
-		end)
+		roleDef = quote mutable struct $role <: $(supertypes[role])
+				$attrs
+			end
+			if !($(supertypes[role]) <: Role)
+				error("Supertype of concrete roles must be Role or a suptype of Role but ", $(supertypes[role]), " (Supertype of ", $role, ") is not.")
+			end
+		end
 		push!(returnExpr.args, roleDef)
 	end
 
@@ -1187,9 +1234,6 @@ function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles.
 	roleTypes = Dict([r => Vector{contextManager.dynTeamsAndData[context][typeof(team)][r]["natType"]}() for r in keys(contextManager.dynTeamsAndData[context][typeof(team)])]...)
 	for pair in roles
 		push!(roleTypes[typeof(pair[2])], pair[1])
-	end
-	if (typeof(team) == typeof(getDynamicTeam(context, typeof(team), roleTypes...)))
-		error("Team $(typeof(team)) is already assigned with the roles $roles")
 	end
 
 	roleCnt = Dict([r => 0 for r in keys(contextManager.dynTeamsAndData[context][typeof(team)])]...)
