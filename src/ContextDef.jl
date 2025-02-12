@@ -114,8 +114,8 @@ end
 end
 
 @with_kw mutable struct ContextControl
-	contextPN::PetriNet = PetriNet()
-	contextPNcompiled::Union{CompiledPetriNet, Nothing} = nothing
+	contextPN::Vector{PetriNet} = [PetriNet()]
+	contextPNcompiled::Vector{Union{CompiledPetriNet, Nothing}} = Union{CompiledPetriNet, Nothing}[nothing]
 end
 
 global contextManager = ContextManagement()
@@ -124,8 +124,8 @@ global contextControler = ContextControl()
 #### Functions and macros ####
 
 function setControlPNs(pn::PetriNet, cpn::CompiledPetriNet)
-	contextControler.contextPN = pn
-	contextControler.contextPNcompiled = cpn
+	contextControler.contextPN = [pn]
+	contextControler.contextPNcompiled = [cpn]
 end
 
 function getControlPN()
@@ -136,12 +136,21 @@ function getCompiledControlPN()
 	contextControler.contextPNcompiled
 end
 
-function addPNToControlPN(pn::PetriNet)
+function addPNToControlPN(pn::PetriNet; priority::Int=1)
+	if priority < 1
+		error("Priority must be >= 1 but $priority was specified.")
+	end
+	if length(contextControler.contextPN) < priority
+		while priority - length(contextControler.contextPN) > 0
+			push!(contextControler.contextPN, PetriNet())
+			push!(contextControler.contextPNcompiled, nothing)
+		end
+	end
 	cpn = compile(pn)
-	contextControler.contextPN.places == [] ? contextControler.contextPN.places = pn.places : push!(contextControler.contextPN.places, pn.places...)
-	contextControler.contextPN.transitions == [] ? contextControler.contextPN.transitions = pn.transitions : push!(contextControler.contextPN.transitions, pn.transitions...)
-	contextControler.contextPN.arcs == [] ? contextControler.contextPN.arcs = pn.arcs : push!(contextControler.contextPN.arcs, pn.arcs...)
-	contextControler.contextPNcompiled = mergeCompiledPetriNets(contextControler.contextPNcompiled, cpn)
+	contextControler.contextPN[priority].places == [] ? contextControler.contextPN[priority].places = pn.places : push!(contextControler.contextPN[priority].places, pn.places...)
+	contextControler.contextPN[priority].transitions == [] ? contextControler.contextPN[priority].transitions = pn.transitions : push!(contextControler.contextPN[priority].transitions, pn.transitions...)
+	contextControler.contextPN[priority].arcs == [] ? contextControler.contextPN[priority].arcs = pn.arcs : push!(contextControler.contextPN[priority].arcs, pn.arcs...)
+	contextControler.contextPNcompiled[priority] = mergeCompiledPetriNets(contextControler.contextPNcompiled[priority], cpn)
 end
 
 function ContextGroup(subContexts::Context...)
@@ -174,19 +183,22 @@ end
 
 function activateContext(context::T) where {T <: Context}
 	if !(context in contextManager.activeContexts) push!(contextManager.activeContexts, context) end
-	runPN(contextControler.contextPNcompiled)
+	for pn in contextControler.contextPNcompiled	
+		runPN(pn)
+	end
 	true
 end
 
 function deactivateContext(context::T) where {T <: Context}
 	deleteat!(contextManager.activeContexts, findall(x->x==context, contextManager.activeContexts))
-	runPN(contextControler.contextPNcompiled)
+	for pn in contextControler.contextPNcompiled	
+		runPN(pn)
+	end
 	true
 end
 
 function deactivateAllContexts()
 	contextManager.activeContexts = []
-	runPN(contextControler.contextPNcompiled)
 	true
 end
 

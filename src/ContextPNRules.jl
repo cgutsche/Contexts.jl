@@ -9,7 +9,7 @@ Arguments:
 
 Returns `true` after creating and adding the Petri net rule to the control network.
 """
-function exclusion(c1::T1, c2::T2) where {T1, T2 <: Context}
+function exclusion(c1::T1, c2::T2; priority::Int=1) where {T1, T2 <: Context}
 	p1 = Place("p1", 0)
 	t1 = Transition("activator1", c1, [])
 	t2 = Transition("updater1", c2, [Update(c2, off)])
@@ -30,7 +30,7 @@ function exclusion(c1::T1, c2::T2) where {T1, T2 <: Context}
 			InhibitorArc(p2, t1, 1)]
 
 	pn = PetriNet([p1, p2], [t1, t2, t3, t4, t5, t6], arcs)
-	addPNToControlPN(pn)
+	addPNToControlPN(pn; priority=priority)
 	true
 end
 
@@ -45,7 +45,7 @@ Arguments:
 
 Returns `true` after creating and adding the Petri net rule to the control network.
 """
-function weakExclusion(c1::T1, c2::T2) where {T1, T2 <: Context}
+function weakExclusion(c1::T1, c2::T2; priority::Int=1) where {T1, T2 <: Context}
 	p1 = Place("p1", 0)
 	t1 = Transition("activator1", c1, [])
 	t2 = Transition("updater1", c2, [Update(c1, off)])
@@ -68,7 +68,7 @@ function weakExclusion(c1::T1, c2::T2) where {T1, T2 <: Context}
 			InhibitorArc(p2, t1, 1)]
 
 	pn = PetriNet([p1, p2], [t1, t2, t3, t4, t5, t6], arcs)
-	addPNToControlPN(pn)
+	addPNToControlPN(pn; priority=priority)
 	true
 end
 
@@ -84,11 +84,11 @@ Arguments:
 
 Returns `true` after creating all Petri net rules.
 """
-function weakExclusion(c1::T1, c2::T2, args...) where {T1, T2 <: Context}
+function weakExclusion(c1::T1, c2::T2, args...; priority::Int=1) where {T1, T2 <: Context}
 	contextList::Vector{<:Context} = [c1, c2, args...] 
 	for i in eachindex(contextList)[1:end-1]
 		for j in eachindex(contextList)[i+1:end]
-			weakExclusion(contextList[i], contextList[j])
+			weakExclusion(contextList[i], contextList[j]; priority=priority)
 		end
 	end
 end
@@ -104,7 +104,7 @@ Arguments:
 
 Returns `true` after creating and adding the Petri net rule.
 """
-function directedExclusion(p::Pair{T1, T2}) where {T1, T2 <: Context}
+function directedExclusion(p::Pair{T1, T2}; priority::Int=1) where {T1, T2 <: Context}
 	c1 = p[1]
 	c2 = p[2]
 	p1 = Place("p", 0)
@@ -117,7 +117,7 @@ function directedExclusion(p::Pair{T1, T2}) where {T1, T2 <: Context}
 			InhibitorArc(p1, t1, 1)]
 
 	pn = PetriNet([p1], [t1, t2, t3], arcs)
-	addPNToControlPN(pn)
+	addPNToControlPN(pn; priority=priority)
 	true
 end
 
@@ -132,7 +132,7 @@ Arguments:
 
 Returns `true` after creating and adding the Petri net rule.
 """
-function weakInclusion(p::Pair{T1, T2}) where {T1 <: Union{AbstractContextRule, Context}, T2 <: Context}
+function weakInclusion(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Union{AbstractContextRule, Context}, T2 <: Context}
 	c1 = p[1]
 	c2 = p[2]
 	p1 = Place("p", 0)
@@ -143,7 +143,7 @@ function weakInclusion(p::Pair{T1, T2}) where {T1 <: Union{AbstractContextRule, 
 			InhibitorArc(p1, t1, 1)]
 
 	pn = PetriNet([p1], [t1, t2], arcs)
-	addPNToControlPN(pn)
+	addPNToControlPN(pn; priority=priority)
 	true
 end
 
@@ -159,7 +159,7 @@ Arguments:
 Returns `true` after creating and adding the Petri net rule.
 Throws an error if first element contains non-OR operations.
 """
-function strongInclusion(p::Pair{T1, T2}) where {T1 <: Union{OrContextRule, Context}, T2 <: Context}
+function strongInclusion(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Union{OrContextRule, Context}, T2 <: Context}
 	function checkOR(c1::Context) end
 	function checkOR(c1::OrContextRule)
 		if c1 isa OrContextRule
@@ -185,7 +185,7 @@ function strongInclusion(p::Pair{T1, T2}) where {T1 <: Union{OrContextRule, Cont
 			InhibitorArc(p1, t1, 1)]
 
 	pn = PetriNet([p1], [t1, t2, t3], arcs)
-	addPNToControlPN(pn)
+	addPNToControlPN(pn; priority=priority)
 	true
 end
 
@@ -200,7 +200,7 @@ Arguments:
 
 Returns `true` after creating and adding the Petri net rule.
 """
-function requirement(p::Pair{T1, T2}) where {T1 <: Context, T2 <: Union{AbstractContextRule, Context}}
+function requirement(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Context, T2 <: Union{AbstractContextRule, Context}}
 	c1 = p[1]
 	c2 = p[2]
 	p1 = Place("p", 0)
@@ -212,7 +212,7 @@ function requirement(p::Pair{T1, T2}) where {T1 <: Context, T2 <: Union{Abstract
 			NormalArc(p1, t3, 1, 1),  
 			InhibitorArc(p1, t1, 1)]
 	pn = PetriNet([p1], [t1, t2, t3], arcs)
-	addPNToControlPN(pn)
+	addPNToControlPN(pn; priority=priority)
 	true
 end
 
@@ -229,9 +229,14 @@ Arguments:
 Returns `true` after creating and adding the Petri net rule to the control network.
 Throws an error if less than 2 contexts are provided.
 """
-function alternative(contexts::Context...)
+function alternative(contexts::Context...; priority::Int=1)
 	if length(contexts) < 2
 		error("alternative() requires at least 2 contexts")
+	end
+	for c in contexts
+		if length(filter(x -> c==x, contexts)) > 1
+			error("alternative() contains $c more thean once.")
+		end
 	end
 
 	places = []
@@ -265,6 +270,6 @@ function alternative(contexts::Context...)
 	end
 
 	pn = PetriNet(places, transitions, arcs)
-	addPNToControlPN(pn)
+	addPNToControlPN(pn; priority=priority)
 	true
 end
