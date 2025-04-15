@@ -182,9 +182,11 @@ function deactivateContextWithoutPN(context::T) where {T <: Context}
 end
 
 function activateContext(context::T) where {T <: Context}
-	if !(context in contextManager.activeContexts) push!(contextManager.activeContexts, context) end
-	for pn in contextControler.contextPNcompiled	
-		runPN(pn)
+	if !(context in contextManager.activeContexts) 
+		push!(contextManager.activeContexts, context)
+		for pn in contextControler.contextPNcompiled	
+			runPN(pn)
+		end
 	end
 	true
 end
