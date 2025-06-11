@@ -10,7 +10,9 @@ abstract type Team end
 
 abstract type DynamicTeam end
 
-abstract type Context end
+abstract type AbstractContext end
+
+abstract type Context <: AbstractContext end
 
 struct ContextGroup
 	subContexts::Vector{Context}
@@ -18,20 +20,20 @@ end
 
 #### Context rule (condition) regarded type definitions ####
 
-abstract type AbstractContextRule end
+abstract type AbstractContextRule <: AbstractContext end
 
 struct AndContextRule <: AbstractContextRule
-	c1::Union{<:Context, <:AbstractContextRule}
-	c2::Union{<:Context, <:AbstractContextRule}
+	c1::Union{<:AbstractContext}
+	c2::Union{<:AbstractContext}
 end
 
 struct OrContextRule <: AbstractContextRule
-	c1::Union{<:Context, <:AbstractContextRule}
-	c2::Union{<:Context, <:AbstractContextRule}
+	c1::Union{<:AbstractContext}
+	c2::Union{<:AbstractContext}
 end
 
 struct NotContextRule <: AbstractContextRule
-	c::Union{<:Context, <:AbstractContextRule}
+	c::Union{<:AbstractContext}
 end
 
 #### Petri Net type definitions ####
@@ -56,7 +58,7 @@ end
 
 struct Transition <: PNObject 
     name::String
-    contexts::Union{<:Context, Any, <:AbstractContextRule}
+    contexts::Union{Nothing, <:AbstractContext}
     updates::AbstractArray{Update}
 end
 
@@ -420,22 +422,32 @@ function getRole(obj::T, team::DynamicTeam) where T
 end
 
 function getRoles(context::Union{Context, Nothing}, obj)
-	return contextManager.roleDB[obj][context]
+	if haskey(contextManager.roleDB, obj)
+		return contextManager.roleDB[obj][context]
+	end
+	return nothing
 end
 
 function getRoles(obj)
-	return contextManager.roleDB[obj]
+	if haskey(contextManager.roleDB, obj)
+		return contextManager.roleDB[obj]
+	end
+	return nothing
 end
 
-function getRoles(context::Union{Context, Nothing}, team::Team)
+function getRolesOfTeam(context::Union{Context, Nothing}, team::Team)
 	contextManager.teamDB[context][team]
 end
 
-function getRoles(context::Union{Context, Nothing}, team::DynamicTeam)
+function getRolesOfTeam(team::Team)
+	contextManager.teamDB[nothing][team]
+end
+
+function getRolesOfTeam(context::Union{Context, Nothing}, team::DynamicTeam)
 	contextManager.dynTeamDB[context][team]
 end
 
-function getRoles(team::DynamicTeam)
+function getRolesOfTeam(team::DynamicTeam)
 	contextManager.dynTeamDB[nothing][team]
 end
 
@@ -476,6 +488,7 @@ function getDynamicTeamID(context::Union{Context, Nothing}, team::DynamicTeam)
 end
 
 function getDynamicTeamID(team::DynamicTeam)
+	println(contextManager.dynTeamsProp)
 	contextManager.dynTeamsProp[nothing][team]
 end
 
@@ -1043,7 +1056,6 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 	if teamProps["max"] < count
 		error("Set maximum assigned roles is $(teamProps["max"]), current is $(count).")
 	end
-
 	for rolePair in roleDisassignment
 		role = rolePair[2]
 		obj = rolePair[1]
@@ -1061,6 +1073,12 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 			error("$obj does not play role $role.")
 		end
 		filter!(x -> x != obj, roles[role])
+		if isempty(contextManager.roleDB[obj][context])
+			delete!(contextManager.roleDB[obj], context)
+			if isempty(contextManager.roleDB[obj])
+			delete!(contextManager.roleDB, obj)
+			end
+		end
 	end
 end
 
@@ -1168,6 +1186,13 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 		end
 		#filter!(x -> x != obj, contextManager.dynTeamDB[context][team][role])
 		deleteat!(roles[role], findfirst(isequal(obj), roles[role]))
+		println("XXX ", contextManager.roleDB[obj])
+		if isempty(contextManager.roleDB[obj][context])
+			delete!(contextManager.roleDB[obj], context)
+			if isempty(contextManager.roleDB[obj])
+			delete!(contextManager.roleDB, obj)
+			end
+		end
 	end
 
 	for rolePair in roleAssignment
@@ -1528,15 +1553,15 @@ function isActive(context::Nothing)
 	true
 end
 
-function Base.:&(c1::CT1, c2::CT2) where {CT1, CT2 <: Union{Context, AbstractContextRule}}
+function Base.:&(c1::CT1, c2::CT2) where {CT1, CT2 <: Union{AbstractContext}}
     AndContextRule(c1, c2)
 end
 
-function Base.:|(c1::CT1, c2::CT2) where {CT1, CT2 <: Union{Context, AbstractContextRule}}
+function Base.:|(c1::CT1, c2::CT2) where {CT1, CT2 <: Union{AbstractContext}}
     OrContextRule(c1, c2)
 end
 
-function Base.:!(c::CT) where {CT <: Union{Context, AbstractContextRule}}
+function Base.:!(c::CT) where {CT <: Union{AbstractContext}}
     NotContextRule(c)
 end
 
@@ -1738,7 +1763,7 @@ function getCDNF(cr::AbstractContextRule)
 	cr = removeDoubleTerms(cr)
 end
 
-function genContextRuleMatrix(cr::T, cdict::Dict, nc::Int) where {T <: Union{Context, Any, AbstractContextRule}}
+function genContextRuleMatrix(cr::T, cdict::Dict, nc::Int) where {T <: Union{AbstractContext, Nothing}}
     matrix = zeros(1, nc)
     if typeof(cr) <: AbstractContextRule
         if cr isa AndContextRule
