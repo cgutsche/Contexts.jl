@@ -1186,7 +1186,6 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 		end
 		#filter!(x -> x != obj, contextManager.dynTeamDB[context][team][role])
 		deleteat!(roles[role], findfirst(isequal(obj), roles[role]))
-		println("XXX ", contextManager.roleDB[obj])
 		if isempty(contextManager.roleDB[obj][context])
 			delete!(contextManager.roleDB[obj], context)
 			if isempty(contextManager.roleDB[obj])
