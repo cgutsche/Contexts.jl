@@ -577,7 +577,7 @@ macro newContext(contextName)
 		contextTypeNameSymbol = Symbol(contextName, :ContextType)
 
 		structDefExpr = :(struct $(contextTypeNameSymbol) <: Context end;)
-		SingletonDefExpr = :($(contextName) = $contextTypeNameSymbol())
+		SingletonDefExpr = :($(contextName)::$contextTypeNameSymbol = $contextTypeNameSymbol())
 
 		return esc(:($structDefExpr; $SingletonDefExpr; addContext($contextName)))
 	else
