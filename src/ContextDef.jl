@@ -488,7 +488,6 @@ function getDynamicTeamID(context::Union{Context, Nothing}, team::DynamicTeam)
 end
 
 function getDynamicTeamID(team::DynamicTeam)
-	println(contextManager.dynTeamsProp)
 	contextManager.dynTeamsProp[nothing][team]
 end
 
@@ -1290,7 +1289,7 @@ function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles.
 	for rolePair in roles
 		obj = rolePair[1]
 		role = rolePair[2]
-		if !(typeof(obj) == contextManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"])
+		if !(typeof(obj) <: contextManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"])
 			error("Role $(typeof(role)) can not be assigned to Type $(typeof(obj))")
 		end
 		if !(obj in keys(contextManager.roleDB))
