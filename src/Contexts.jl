@@ -11,6 +11,7 @@ export runPN
 
 include("ContextPNRules.jl")
 export exclusion, weakExclusion, directedExclusion, strongInclusion, weakInclusion, requirement, alternative
+export getConstraints
 
 
 end

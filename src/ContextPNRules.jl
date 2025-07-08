@@ -1,3 +1,30 @@
+abstract type Constraint end
+
+struct Exclusion <: Constraint
+    contexts::Vector{Context}
+end
+struct Requirement <: Constraint
+    contexts::Pair{Context, AbstractContext}
+end
+struct Inclusion <: Constraint
+    contexts::Pair{AbstractContext, Context}
+end
+struct Alternative <: Constraint
+    contexts::Vector{Context}
+end
+@with_kw mutable struct ContextRuleManagement
+	constraints::Vector{Constraint} = []
+end
+contextRuleManager = ContextRuleManagement()
+
+"""
+Note that constraints and Rules are not the same thing.
+A Constraint must always be true, e.g. An Exclusion between to ru
+"""
+
+addConstraint(constraint::Constraint) = push!(contextRuleManager.constraints, constraint)
+getConstraints() = contextRuleManager.constraints
+
 """
     exclusion(c1::T1, c2::T2) where {T1, T2 <: Context}
 
@@ -31,6 +58,7 @@ function exclusion(c1::T1, c2::T2; priority::Int=1) where {T1, T2 <: Context}
 
 	pn = PetriNet([p1, p2], [t1, t2, t3, t4, t5, t6], arcs)
 	addPNToControlPN(pn; priority=priority)
+	addConstraint(Exclusion([c1, c2]))
 	true
 end
 
@@ -69,6 +97,7 @@ function weakExclusion(c1::T1, c2::T2; priority::Int=1) where {T1, T2 <: Context
 
 	pn = PetriNet([p1, p2], [t1, t2, t3, t4, t5, t6], arcs)
 	addPNToControlPN(pn; priority=priority)
+	addConstraint(Exclusion([c1, c2]))
 	true
 end
 
@@ -91,6 +120,8 @@ function weakExclusion(c1::T1, c2::T2, args...; priority::Int=1) where {T1, T2 <
 			weakExclusion(contextList[i], contextList[j]; priority=priority)
 		end
 	end
+	addConstraint(Exclusion(contextList))
+	true
 end
 
 """
@@ -186,6 +217,7 @@ function strongInclusion(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Union{Or
 
 	pn = PetriNet([p1], [t1, t2, t3], arcs)
 	addPNToControlPN(pn; priority=priority)
+	addConstraint(Inclusion([c1, c2]))
 	true
 end
 
@@ -200,7 +232,7 @@ Arguments:
 
 Returns `true` after creating and adding the Petri net rule.
 """
-function requirement(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Context, T2 <: Union{AbstractContextRule, Context}}
+function requirement(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Context, T2 <: Union{AbstractContext}}
 	c1 = p[1]
 	c2 = p[2]
 	p1 = Place("p", 0)
@@ -213,6 +245,7 @@ function requirement(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Context, T2 
 			InhibitorArc(p1, t1, 1)]
 	pn = PetriNet([p1], [t1, t2, t3], arcs)
 	addPNToControlPN(pn; priority=priority)
+	addConstraint(Requirement(c1 => c2))
 	true
 end
 
@@ -271,5 +304,6 @@ function alternative(contexts::Context...; priority::Int=1)
 
 	pn = PetriNet(places, transitions, arcs)
 	addPNToControlPN(pn; priority=priority)
+	addConstraint(Alternative(collect(contexts)))
 	true
 end

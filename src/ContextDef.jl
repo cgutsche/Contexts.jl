@@ -1332,6 +1332,12 @@ function disassignRoles(context::Union{Context, Nothing}, t::Team, roles::Pair..
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
 		delete!(contextManager.roleDB[obj][context], team)
+		if isempty(contextManager.roleDB[obj][context])
+			delete!(contextManager.roleDB[obj], context)
+			if isempty(contextManager.roleDB[obj])
+			delete!(contextManager.roleDB, obj)
+			end
+		end
 	end
 	for (i, roleGroup) in enumerate(contextManager.teamDB[context][team])
 		if roleGroup == Dict(rolesMirrored...)
@@ -1364,6 +1370,12 @@ function disassignRoles(context::Union{Context, Nothing}, teamType::Type, roles:
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
 		delete!(contextManager.roleDB[obj][context], team)
+		if isempty(contextManager.roleDB[obj][context])
+			delete!(contextManager.roleDB[obj], context)
+			if isempty(contextManager.roleDB[obj])
+			delete!(contextManager.roleDB, obj)
+			end
+		end
 	end
 	for (i, roleGroup) in enumerate(contextManager.teamDB[context][team])
 		if roleGroup == Dict(rolesMirrored...)
@@ -1398,6 +1410,12 @@ function disassignRoles(context::Union{Context, Nothing}, team::DynamicTeam)
 				error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 			end
 			delete!(contextManager.roleDB[obj][context], team)
+			if isempty(contextManager.roleDB[obj][context])
+			delete!(contextManager.roleDB[obj], context)
+			if isempty(contextManager.roleDB[obj])
+			delete!(contextManager.roleDB, obj)
+			end
+		end
 		end
 	end
 	delete!(contextManager.dynTeamDB[context], team)
