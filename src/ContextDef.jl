@@ -410,11 +410,14 @@ function getRoles(context::Union{Context, Nothing}, obj, role::Type)
 end
 
 function getRole(context::Union{Context, Nothing}, obj::T, team::DynamicTeam) where T
-	d = get!(get!(contextManager.roleDB, obj, Dict()), context, Dict())
-	if !(haskey(d, team))
+	if !(haskey(contextManager.roleDB, obj))
+		return nothing
+	elseif !(haskey(contextManager.roleDB[obj], context))
+		return nothing
+	elseif !(haskey(d, team))
 		return nothing
 	end
-	d[team]
+	contextManager.roleDB[obj][context][team]
 end
 
 function getRole(obj::T, team::DynamicTeam) where T
@@ -1411,14 +1414,17 @@ function disassignRoles(context::Union{Context, Nothing}, team::DynamicTeam)
 			end
 			delete!(contextManager.roleDB[obj][context], team)
 			if isempty(contextManager.roleDB[obj][context])
-			delete!(contextManager.roleDB[obj], context)
-			if isempty(contextManager.roleDB[obj])
-			delete!(contextManager.roleDB, obj)
+				delete!(contextManager.roleDB[obj], context)
+				if isempty(contextManager.roleDB[obj])
+					delete!(contextManager.roleDB, obj)
+				end
 			end
-		end
 		end
 	end
 	delete!(contextManager.dynTeamDB[context], team)
+	if isempty(contextManager.dynTeamDB[context])
+		delete!(contextManager.roleDB, context)
+	end
 end
 
 function disassignRoles(team::DynamicTeam)
