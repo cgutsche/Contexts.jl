@@ -414,7 +414,7 @@ function getRole(context::Union{Context, Nothing}, obj::T, team::DynamicTeam) wh
 		return nothing
 	elseif !(haskey(contextManager.roleDB[obj], context))
 		return nothing
-	elseif !(haskey(d, team))
+	elseif !(haskey(contextManager.roleDB[obj][context], team))
 		return nothing
 	end
 	contextManager.roleDB[obj][context][team]
