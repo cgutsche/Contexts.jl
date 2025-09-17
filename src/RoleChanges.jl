@@ -1,4 +1,18 @@
+"""
+    Base.:(<<)(mixin::DataType, type::DataType)
 
+Checks if a mixin or role can be assigned to a natural type using the << operator.
+Returns true if assignment is valid, false otherwise.
+
+Arguments:
+- `mixin`: Mixin or Role type
+- `type`: Target type
+
+Returns true or false.
+
+Example:
+    MyMixin << MyType
+"""
 function Base.:(<<)(mixin::DataType, type::DataType)
 	if mixin <: Mixin
 		for entry in values(contextManager.mixins)
@@ -22,6 +36,18 @@ function Base.:(<<)(mixin::DataType, type::DataType)
 	false
 end
 
+"""
+    assignMixin(context::Context, pair::Pair)
+
+Assigns a mixin to a type in a given context.
+
+Arguments:
+- `context`: Context
+- `pair`: Pair of (type, mixin)
+
+Example:
+    assignMixin(ctx, MyType => MyMixin())
+"""
 function assignMixin(context::Context, pair::Pair)
 	type = pair[1]
 	mixin = pair[2]
@@ -44,6 +70,18 @@ function assignMixin(context::Context, pair::Pair)
 	end
 end
 
+"""
+    disassignMixin(context::Context, pair::Pair)
+
+Removes a mixin assignment from a type in a given context.
+
+Arguments:
+- `context`: Context
+- `pair`: Pair of (type, mixin)
+
+Example:
+    disassignMixin(ctx, MyType => MyMixin())
+"""
 function disassignMixin(context::Context, pair::Pair)
 	type = pair[1]
 	mixin = pair[2]
@@ -59,6 +97,22 @@ function disassignMixin(context::Context, pair::Pair)
 	end
 end
 
+"""
+    @assignRoles(context, team, attrs)
+
+Macro to assign roles to objects in a team within a context.
+
+Arguments:
+- `context`: Context
+- `team`: Team type
+- `attrs`: Block of assignments (object >> Role)
+
+Example:
+    @assignRoles(ctx, MyTeam, begin
+        obj1 >> RoleA
+        obj2 >> RoleB
+    end)
+"""
 macro assignRoles(context, team, attrs)
 	teamExpr = :($team())
 	roleExpr = :()
@@ -76,6 +130,21 @@ macro assignRoles(context, team, attrs)
 	return esc(:(assignRoles($context, $teamExpr, $roleExpr...)))
 end
 
+"""
+    @assignRoles(team, attrs)
+
+Macro to assign roles to objects in a team (no context).
+
+Arguments:
+- `team`: Team type
+- `attrs`: Block of assignments (object >> Role)
+
+Example:
+    @assignRoles(MyTeam, begin
+        obj1 >> RoleA
+        obj2 >> RoleB
+    end)
+"""
 macro assignRoles(team, attrs)
 	teamExpr = :($team())
 	roleExpr = :()
@@ -93,6 +162,22 @@ macro assignRoles(team, attrs)
 	return esc(:(assignRoles(nothing, $teamExpr, $roleExpr...)))
 end
 
+"""
+    @disassignRoles(context, team, attrs)
+
+Macro to remove role assignments from objects in a team within a context.
+
+Arguments:
+- `context`: Context
+- `team`: Team type
+- `attrs`: Block of assignments (Role >> object)
+
+Example:
+    @disassignRoles(ctx, MyTeam, begin
+        RoleA >> obj1
+        RoleB >> obj2
+    end)
+"""
 macro disassignRoles(context, team, attrs)
 	teamExpr = :($team())
 	roleExpr = :()
@@ -110,6 +195,21 @@ macro disassignRoles(context, team, attrs)
 	return esc(:(disassignRoles($context, $teamExpr, $roleExpr...)))
 end
 
+"""
+    @disassignRoles(team, attrs)
+
+Macro to remove role assignments from objects in a team (no context).
+
+Arguments:
+- `team`: Team type
+- `attrs`: Block of assignments (Role >> object)
+
+Example:
+    @disassignRoles(MyTeam, begin
+        RoleA >> obj1
+        RoleB >> obj2
+    end)
+"""
 macro disassignRoles(team, attrs)
 	teamExpr = :($team())
 	roleExpr = :()
@@ -127,6 +227,23 @@ macro disassignRoles(team, attrs)
 	return esc(:(disassignRoles(nothing, $teamExpr, $roleExpr...)))
 end
 
+"""
+    @changeRoles(context, team, id, attrs)
+
+Macro to change role assignments and disassignments in a dynamic team within a context.
+
+Arguments:
+- `context`: Context
+- `team`: DynamicTeam type
+- `id`: Team id
+- `attrs`: Block of assignments (object >> Role, object << Role)
+
+Example:
+    @changeRoles(ctx, MyDynTeam, 1, begin
+        obj1 >> RoleA
+        obj2 << RoleB
+    end)
+"""
 macro changeRoles(context, team, id, attrs)
 	roleAssignmentExpr = :([])
 	roleDisassignmentExpr = :([])
@@ -149,6 +266,22 @@ macro changeRoles(context, team, id, attrs)
 	return esc(:(changeRoles($context, $teamObject, $roleAssignmentExpr, $roleDisassignmentExpr)))
 end
 
+"""
+    @changeRoles(team, id, attrs)
+
+Macro to change role assignments and disassignments in a dynamic team (no context).
+
+Arguments:
+- `team`: DynamicTeam type
+- `id`: Team id
+- `attrs`: Block of assignments (object >> Role, object << Role)
+
+Example:
+    @changeRoles(MyDynTeam, 1, begin
+        obj1 >> RoleA
+        obj2 << RoleB
+    end)
+"""
 macro changeRoles(team, id, attrs)
 	roleAssignmentExpr = :([])
 	roleDisassignmentExpr = :([])
@@ -171,6 +304,20 @@ macro changeRoles(team, id, attrs)
 	return esc(:(changeRoles(nothing, $teamObject, $roleAssignmentExpr, $roleDisassignmentExpr)))
 end
 
+"""
+    changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Any}, roleDisassignment::Vector{Pair{T, DataType}})
+
+Changes role assignments and disassignments in a dynamic team within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `team`: DynamicTeam
+- `roleAssignment`: Vector of assignments (object, Role)
+- `roleDisassignment`: Vector of disassignments (object, Role type)
+
+Example:
+    changeRoles(ctx, team, [(obj1, RoleA)], [(obj2, RoleB)])
+"""
 function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Any}, roleDisassignment::Vector{Pair{T, DataType}}) where T
 	roles = contextManager.dynTeamDB[context][team]
 	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
@@ -228,6 +375,20 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 	end
 end
 
+"""
+    changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Pair{T, R}}, roleDisassignment::Vector{Any}) where T where R <: Role
+
+Changes role assignments in a dynamic team within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `team`: DynamicTeam
+- `roleAssignment`: Vector of assignments (object, Role)
+- `roleDisassignment`: Vector of objects to disassign
+
+Example:
+    changeRoles(ctx, team, [(obj1, RoleA)], [obj2])
+"""
 function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Pair{T, R}}, roleDisassignment::Vector{Any}) where T where R <: Role
 	roles = contextManager.dynTeamDB[context][team]
 	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
@@ -275,6 +436,20 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 	end
 end
 
+"""
+    changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Pair{T1, R}}, roleDisassignment::Vector{Pair{T2, DataType}}) where T1 where T2 where R <: Role
+
+Changes role assignments and disassignments in a dynamic team within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `team`: DynamicTeam
+- `roleAssignment`: Vector of assignments (object, Role)
+- `roleDisassignment`: Vector of disassignments (object, Role type)
+
+Example:
+    changeRoles(ctx, team, [(obj1, RoleA)], [(obj2, RoleB)])
+"""
 function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Pair{T1, R}}, roleDisassignment::Vector{Pair{T2, DataType}}) where T1 where T2 where R <: Role
 	roles = contextManager.dynTeamDB[context][team]
 	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
@@ -355,6 +530,19 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 	end
 end
 
+"""
+    assignRoles(context::Union{Context, Nothing}, team::Team, roles...)
+
+Assigns roles to objects in a team within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `team`: Team
+- `roles...`: Pairs of (object, Role)
+
+Example:
+    assignRoles(ctx, team, obj1 => RoleA, obj2 => RoleB)
+"""
 function assignRoles(context::Union{Context, Nothing}, team::Team, roles...)
 	roleTypes = []
 	for pair in roles
@@ -402,6 +590,19 @@ function assignRoles(context::Union{Context, Nothing}, team::Team, roles...)
 	team
 end
 
+"""
+    assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles...)
+
+Assigns roles to objects in a dynamic team within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `team`: DynamicTeam
+- `roles...`: Pairs of (object, Role)
+
+Example:
+    assignRoles(ctx, team, obj1 => RoleA, obj2 => RoleB)
+"""
 function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles...)
 	roleTypes = Dict([r => Vector{contextManager.dynTeamsAndData[context][typeof(team)][r]["natType"]}() for r in keys(contextManager.dynTeamsAndData[context][typeof(team)])]...)
 	for pair in roles
@@ -455,6 +656,19 @@ function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles.
 	team
 end
 
+"""
+    disassignRoles(context::Union{Context, Nothing}, t::Team, roles::Pair...)
+
+Removes role assignments from objects in a team within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `t`: Team
+- `roles...`: Pairs of (Role, object)
+
+Example:
+    disassignRoles(ctx, team, RoleA => obj1, RoleB => obj2)
+"""
 function disassignRoles(context::Union{Context, Nothing}, t::Team, roles::Pair...)
 	teamType = typeof(t)
 	if !(context in keys(contextManager.teamDB))
@@ -494,6 +708,19 @@ function disassignRoles(context::Union{Context, Nothing}, t::Team, roles::Pair..
 	end	
 end
 
+"""
+    disassignRoles(context::Union{Context, Nothing}, teamType::Type, roles::Pair...)
+
+Removes role assignments from objects in a team type within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `teamType`: Team type
+- `roles...`: Pairs of (Role, object)
+
+Example:
+    disassignRoles(ctx, TeamType, RoleA => obj1)
+"""
 function disassignRoles(context::Union{Context, Nothing}, teamType::Type, roles::Pair...)
 	if !(context in keys(contextManager.teamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
@@ -532,6 +759,18 @@ function disassignRoles(context::Union{Context, Nothing}, teamType::Type, roles:
 	end	
 end
 
+"""
+    disassignRoles(context::Union{Context, Nothing}, team::DynamicTeam)
+
+Removes all role assignments from a dynamic team within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `team`: DynamicTeam
+
+Example:
+    disassignRoles(ctx, team)
+"""
 function disassignRoles(context::Union{Context, Nothing}, team::DynamicTeam)
 	if team in keys(contextManager.roleDB)
 		error("Team $(team) is currently playing a role. You must disassign it before dissolving the team.")
@@ -571,22 +810,85 @@ function disassignRoles(context::Union{Context, Nothing}, team::DynamicTeam)
 	end
 end
 
+"""
+    disassignRoles(team::DynamicTeam)
+
+Removes all role assignments from a dynamic team (no context).
+
+Arguments:
+- `team`: DynamicTeam
+
+Example:
+    disassignRoles(team)
+"""
 function disassignRoles(team::DynamicTeam)
 	disassignRoles(nothing, team)
 end
 
+"""
+    disassignRoles(context::Union{Context, Nothing}, teamType::Type, id)
+
+Removes all role assignments from a dynamic team by type and id within a context.
+
+Arguments:
+- `context`: Context or nothing
+- `teamType`: Team type
+- `id`: Team id
+
+Example:
+    disassignRoles(ctx, TeamType, 1)
+"""
 function disassignRoles(context::Union{Context, Nothing}, teamType::Type, id)
 	disassignRoles(context, getDynamicTeam(context, teamType, id))
 end
 
+"""
+    disassignRoles(teamType::Type, id)
+
+Removes all role assignments from a dynamic team by type and id (no context).
+
+Arguments:
+- `teamType`: Team type
+- `id`: Team id
+
+Example:
+    disassignRoles(TeamType, 1)
+"""
 function disassignRoles(teamType::Type, id)
 	disassignRoles(nothing, teamType, id)
 end
 
+"""
+    Base.:(>>)(context::Context, t, mixin::Mixin)
+
+Assigns a mixin to a type in a context using the >> operator.
+
+Arguments:
+- `context`: Context
+- `t`: Type
+- `mixin`: Mixin
+
+Example:
+    ctx >> MyType >> MyMixin()
+"""
 function Base.:(>>)(context::Context, t, mixin::Mixin)
 	assignMixin(context, t=>mixin)
 end
 
+"""
+    Base.:(>>)(t, mixinType::DataType)
+
+Checks if a type has a mixin of the given type using the >> operator.
+
+Arguments:
+- `t`: Type
+- `mixinType`: Mixin type
+
+Returns true or false.
+
+Example:
+    MyType >> MyMixin
+"""
 function Base.:(>>)(t, mixinType::DataType)
 	for t_mixin in [(values(getMixins(t))...)...]
 		if typeof(t_mixin) == mixinType

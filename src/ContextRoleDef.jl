@@ -1,3 +1,14 @@
+"""
+    @newMixin(context, mixin, attributes)
+
+Macro to define a new Mixin type for a context, with specified attributes.
+Creates a mutable struct subtype of Mixin and registers it for the context.
+
+Arguments:
+- `context`: The context to associate the mixin with
+- `mixin`: The mixin type (with contextual type, e.g. MyMixin<<MyType)
+- `attributes`: Fields for the mixin struct
+"""
 macro newMixin(context, mixin, attributes)
 	typeMixinList = split(repr(mixin), "<<")
 	contextualType = Symbol(strip((typeMixinList[2])[1:end-1]))
@@ -11,6 +22,41 @@ macro newMixin(context, mixin, attributes)
 	return esc(:($newStructExpr; addMixin($context, $contextualType, $mixin)))
 end
 
+"""
+    @newTeam(contextName, teamName, teamContent)
+
+Macro to define a new Team type for a context, with specified roles and attributes.
+Creates a mutable struct subtype of Team and role structs, and registers them.
+
+A Team always contains a fixed number of roles. 
+Once a team is created, the role assignment cannot be changed without 
+dissolving the team and creating a new one.
+
+Arguments:
+- `contextName`: The context for the team
+- `teamName`: The name of the team
+- `teamContent`: Block containing:
+	- @relationalAttributes: relational attributes of the team
+	- @role: role definitions
+
+@role definitions must contain at least two roles.
+The syntax for defining roles is:
+	@role RoleName << NaturalType [<: RoleSuperType] begin
+		# role-specific attributes
+	end
+
+Example:
+@context Tournament @newTeam ChessGame begin
+	@relationalAttributes begin
+		place::String
+	end
+	@role BlackPlayer << Person <: Player begin
+		end
+	@role WhitePlayer << Person <: Player begin
+		end
+end
+
+"""
 macro newTeam(contextName, teamName, teamContent)
 	teamSuperType = :Team
 	if typeof(contextName) == String || typeof(contextName) == Symbol
@@ -106,11 +152,101 @@ macro newTeam(contextName, teamName, teamContent)
 	return esc(returnExpr)
 end
 
+"""
+    @newTeam(teamName, teamContent)
+
+Macro to define a new Team type without a context.
+Creates a mutable struct subtype of Team and role structs, and registers them.
+
+
+A Team always contains a fixed number of roles. 
+Once a team is created, the role assignment cannot be changed without 
+dissolving the team and creating a new one.
+
+Arguments:
+- `teamName`: The name of the team
+- `teamContent`: Block containing:
+	- @relationalAttributes: relational attributes of the team
+	- @role: role definitions
+
+@role definitions must contain at least two roles.
+The syntax for defining roles is:
+	@role RoleName << NaturalType [<: RoleSuperType] begin
+		# role-specific attributes
+	end
+
+Example:
+@newTeam ChessGame begin
+	@relationalAttributes begin
+		place::String
+	end
+	@role BlackPlayer << Person <: Player begin
+		end
+	@role WhitePlayer << Person <: Player begin
+		end
+end
+
+"""
 macro newTeam(teamName, teamContent)
 	returnExpr = quote newTeam(nothing, $teamName, $teamContent) end
 	esc(returnExpr)
 end
 
+"""
+    @newDynamicTeam(contextName, teamName, teamContent)
+
+Macro to define a new DynamicTeam type for a context, with specified roles, attributes, and cardinalities.
+Creates a mutable struct subtype of DynamicTeam and role structs, and registers them.
+
+A dynamic team can change its role assignments over time, within the defined 
+cardinalities. Roles can be assigned and disassigned dynamically without dissolving	
+the team. Roles might be optional (i.e., minimum cardinality can be zero).
+
+There are role-specific cardinalities as well as team-wide cardinalities.
+
+Arguments:
+- `contextName`: The context for the dynamic team
+- `teamName`: The name of the dynamic team
+- `teamContent`: Block containing:
+	@IDAttribute: uniquely identifying attribute
+	@relationalAttributes: relational attributes of the team
+	@role: role definitions with cardinalities
+	@minPlayers: minimum number of players in the team (default 2)
+	@maxPlayers: maximum number of players in the team (default Inf)
+
+@role definitions must contain at least two roles including their cardinalities.
+
+The syntax for defining roles is:
+	@role RoleName << NaturalType [minCardinality..maxCardinality] begin
+		# role-specific attributes
+	end
+	
+Example:
+@context Sports @newDynamicTeam BasketballTeam <: SportsTeam begin
+    @IDAttribute name::String
+    @maxPlayers 15
+    @relationalAttributes begin
+		city::String
+	end
+    @role HeadCoach << Person [1] begin end
+	@role PointGuard << Person <: Player [1..Inf] begin
+		number::Int
+	end
+    @role ShootingGuard << Person <: Player [1..Inf] begin
+        number::Int
+    end
+    @role SmallForward << Person <: Player [1..Inf] begin
+        number::Int
+    end
+    @role PowerForward << Person <: Player [1..Inf] begin
+        number::Int
+    end
+    @role Center << Person <: Player [1..Inf] begin
+        number::Int
+    end
+end	
+
+"""
 macro newDynamicTeam(contextName, teamName, teamContent)
 	teamSuperType = :DynamicTeam
 	if typeof(contextName) == String || typeof(contextName) == Symbol
@@ -247,6 +383,59 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 	return esc(returnExpr)
 end
 
+"""
+    @newDynamicTeam(contextName, teamName, teamContent)
+
+Macro to define a new DynamicTeam type with specified roles, attributes, and cardinalities.
+Creates a mutable struct subtype of DynamicTeam and role structs, and registers them.
+
+A dynamic team can change its role assignments over time, within the defined 
+cardinalities. Roles can be assigned and disassigned dynamically without dissolving	
+the team. Roles might be optional (i.e., minimum cardinality can be zero).
+
+There are role-specific cardinalities as well as team-wide cardinalities.
+
+Arguments:
+- `teamName`: The name of the dynamic team
+- `teamContent`: Block containing:
+	@IDAttribute: uniquely identifying attribute
+	@relationalAttributes: relational attributes of the team
+	@role: role definitions with cardinalities
+	@minPlayers: minimum number of players in the team (default 2)
+	@maxPlayers: maximum number of players in the team (default Inf)
+
+@role definitions must contain at least two roles including their cardinalities.
+
+The syntax for defining roles is:
+	@role RoleName << NaturalType [minCardinality..maxCardinality] begin
+		# role-specific attributes
+	end
+	
+Example:
+@newDynamicTeam BasketballTeam <: SportsTeam begin
+    @IDAttribute name::String
+    @maxPlayers 15
+    @relationalAttributes begin
+		city::String
+	end
+    @role HeadCoach << Person [1] begin end
+	@role PointGuard << Person <: Player [1..Inf] begin
+		number::Int
+	end
+    @role ShootingGuard << Person <: Player [1..Inf] begin
+        number::Int
+    end
+    @role SmallForward << Person <: Player [1..Inf] begin
+        number::Int
+    end
+    @role PowerForward << Person <: Player [1..Inf] begin
+        number::Int
+    end
+    @role Center << Person <: Player [1..Inf] begin
+        number::Int
+    end
+end	
+"""
 macro newDynamicTeam(teamName, teamContent)
 	returnExpr = quote @newDynamicTeam(nothing, $teamName, $teamContent) end
 	esc(returnExpr)

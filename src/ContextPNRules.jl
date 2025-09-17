@@ -1,28 +1,69 @@
+"""
+    Constraint
+
+Represents an abstract constraint between contexts.
+"""
 abstract type Constraint end
 
+"""
+    Exclusion
+
+Represents a strict mutual exclusion constraint between contexts.
+"""
 struct Exclusion <: Constraint
     contexts::Vector{Context}
 end
+
+"""
+    Requirement
+
+Represents a requirement constraint: the first context can only be active if the second is active.
+"""
 struct Requirement <: Constraint
     contexts::Pair{Context, AbstractContext}
 end
+
+"""
+    Inclusion
+
+Represents an inclusion constraint: the first context/rule includes the second context.
+"""
 struct Inclusion <: Constraint
     contexts::Pair{AbstractContext, Context}
 end
+
+"""
+    Alternative
+
+Represents an alternative constraint: exactly one context from the group must be active.
+"""
 struct Alternative <: Constraint
     contexts::Vector{Context}
 end
+
+"""
+    ContextRuleManagement
+
+Saves a list of all context constraints and rules.
+- `constraints`: Vector of all defined constraints.
+"""
 @with_kw mutable struct ContextRuleManagement
-	constraints::Vector{Constraint} = []
+    constraints::Vector{Constraint} = []
 end
-contextRuleManager = ContextRuleManagement()
 
 """
-Note that constraints and Rules are not the same thing.
-A Constraint must always be true, e.g. An Exclusion between to ru
-"""
+    addConstraint(constraint::Constraint)
 
+Adds a constraint to the context rule manager.
+- `constraint`: constraint to be added.
+"""
 addConstraint(constraint::Constraint) = push!(contextRuleManager.constraints, constraint)
+
+"""
+    getConstraints()
+
+Returns all constraints from the context rule manager.
+"""
 getConstraints() = contextRuleManager.constraints
 
 """

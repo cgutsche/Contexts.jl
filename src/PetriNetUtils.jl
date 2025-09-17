@@ -1,8 +1,33 @@
+"""
+    mergeCompiledPetriNets(pn1::Union{Nothing, CompiledPetriNet}, pn2::Union{Nothing, CompiledPetriNet})
 
+Merges two compiled Petri nets, handling cases where one is `nothing`.
+
+Arguments:
+- `pn1`, `pn2`: CompiledPetriNet or `nothing`
+
+Returns the non-nothing Petri net, or `pn1` if both are valid.
+
+Example:
+    mergeCompiledPetriNets(nothing, cpn)
+"""
 function mergeCompiledPetriNets(pn1::Union{Nothing, CompiledPetriNet}, pn2::Union{Nothing, CompiledPetriNet})
     typeof(pn1) == Nothing ? pn2 : pn1
 end
 
+"""
+    mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
+
+Merges two compiled Petri nets into a single net by combining their matrices and vectors.
+
+Arguments:
+- `pn1`, `pn2`: CompiledPetriNet objects
+
+Returns a new merged CompiledPetriNet.
+
+Example:
+    mergeCompiledPetriNets(cpn1, cpn2)
+"""
 function mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
     size_pn1_dim1 = size(pn1.WeightMatrix_in)[1]
     size_pn2_dim1 = size(pn2.WeightMatrix_in)[1]
@@ -68,6 +93,19 @@ function mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
                      ContextMap_merge)
 end
 
+"""
+    reduceRuleToElementary(cr::AndContextRule)
+
+Recursively reduces an AndContextRule to elementary context rules.
+
+Arguments:
+- `cr`: AndContextRule
+
+Returns a simplified context rule.
+
+Example:
+    reduceRuleToElementary(AndContextRule(ctx1, ctx2))
+"""
 function reduceRuleToElementary(cr::AndContextRule)
 	a = reduceRuleToElementary(cr.c1)
 	b = reduceRuleToElementary(cr.c2)
@@ -84,18 +122,70 @@ function reduceRuleToElementary(cr::AndContextRule)
 	AndContextRule(a, b)
 end
 
+"""
+    reduceRuleToElementary(cr::OrContextRule)
+
+Recursively reduces an OrContextRule to elementary context rules.
+
+Arguments:
+- `cr`: OrContextRule
+
+Returns a simplified context rule.
+
+Example:
+    reduceRuleToElementary(OrContextRule(ctx1, ctx2))
+"""
 function reduceRuleToElementary(cr::OrContextRule)
 	OrContextRule(reduceRuleToElementary(cr.c1), reduceRuleToElementary(cr.c2))
 end
 
+"""
+    reduceRuleToElementary(c::Context)
+
+Returns the context itself (elementary case).
+
+Arguments:
+- `c`: Context
+
+Returns the context.
+
+Example:
+    reduceRuleToElementary(ctx)
+"""
 function reduceRuleToElementary(c::Context)
 	c
 end
 
+"""
+    reduceRuleToElementary(c::Nothing)
+
+Returns `nothing` for a Nothing context.
+
+Arguments:
+- `c`: Nothing
+
+Returns `nothing`.
+
+Example:
+    reduceRuleToElementary(nothing)
+"""
 function reduceRuleToElementary(c::Nothing)
 	nothing
 end
 
+"""
+    reduceRuleToElementary(cr::NotContextRule)
+
+Reduces a NotContextRule to elementary context rules using De Morgan's laws.
+
+Arguments:
+- `cr`: NotContextRule
+
+Returns a simplified context rule.
+
+Example:
+    reduceRuleToElementary(NotContextRule(ctx))
+"""
 function reduceRuleToElementary(cr::NotContextRule)
 	if typeof(cr.c) == AndContextRule
 		return reduceRuleToElementary(OrContextRule(!(cr.c.c1), !(cr.c.c2)))
@@ -111,6 +201,19 @@ function reduceRuleToElementary(cr::NotContextRule)
 	end
 end
 
+"""
+    getCDNF(cr::AbstractContextRule)
+
+Converts a context rule to canonical disjunctive normal form (CDNF).
+
+Arguments:
+- `cr`: AbstractContextRule
+
+Returns a context rule in CDNF.
+
+Example:
+    getCDNF(AndContextRule(ctx1, ctx2))
+"""
 function getCDNF(cr::AbstractContextRule)
 	function removeDoubleTerms(cr::AbstractContextRule)
 		function getAndRules(cr::OrContextRule, l)
@@ -194,6 +297,21 @@ function getCDNF(cr::AbstractContextRule)
 	cr = removeDoubleTerms(cr)
 end
 
+"""
+    genContextRuleMatrix(cr::T, cdict::Dict, nc::Int) where {T <: Union{AbstractContext, Nothing}}
+
+Generates a matrix representation of a context rule for Petri net compilation.
+
+Arguments:
+- `cr`: Context or context rule
+- `cdict`: Dictionary mapping contexts to indices
+- `nc`: Number of contexts
+
+Returns a matrix encoding the rule.
+
+Example:
+    genContextRuleMatrix(ctx, cdict, nc)
+"""
 function genContextRuleMatrix(cr::T, cdict::Dict, nc::Int) where {T <: Union{AbstractContext, Nothing}}
     matrix = zeros(1, nc)
     if typeof(cr) <: AbstractContextRule
@@ -220,6 +338,19 @@ function genContextRuleMatrix(cr::T, cdict::Dict, nc::Int) where {T <: Union{Abs
     matrix
 end
 
+"""
+    compile(pn::PetriNet)
+
+Compiles a PetriNet into a CompiledPetriNet for efficient execution.
+
+Arguments:
+- `pn`: PetriNet object
+
+Returns a CompiledPetriNet.
+
+Example:
+    compile(pn)
+"""
 function compile(pn::PetriNet)
     # should test here if name is given two times
     # should test here if arcs are connected correctly (not place to place etc.)
