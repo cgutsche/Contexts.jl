@@ -11,3 +11,7 @@ makedocs(sitename="Contexts.jl",
             "Dynamic Teams" => "DynamicTeamsAndRoles.md"
             ]
         )
+
+deploydocs(
+    repo = "github.com/cgutsche/Contexts.jl.git",
+)
