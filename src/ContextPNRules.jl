@@ -51,6 +51,9 @@ Saves a list of all context constraints and rules.
     constraints::Vector{Constraint} = []
 end
 
+contextRuleManager = ContextRuleManagement()
+
+
 """
     addConstraint(constraint::Constraint)
 
