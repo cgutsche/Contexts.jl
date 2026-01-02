@@ -1,3 +1,27 @@
+
+"""
+    RoleManagement
+
+Holds all context-related data structures, including:
+- `contexts`: All defined contexts.
+- `activeContexts`: Currently active contexts.
+- `mixins`, `mixinTypeDB`, `mixinDB`: Mixin management.
+- `teamsAndRoles`, `roleDB`, `teamDB`, `dynTeamDB`, `dynTeamsAndData`, `dynTeamsProp`: Team and role management.
+"""
+
+@with_kw mutable struct RoleManagement
+	mixins::Dict{Context, Dict{Any, Vector{DataType}}} = Dict()
+	mixinTypeDB::Dict{Any, Dict{Context, DataType}} = Dict()
+	mixinDB::Dict{Any, Dict{Context, Vector{Any}}} = Dict()
+	teamsAndRoles::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, DataType}}} = Dict()
+	roleDB::Dict{Any, Dict{Union{Context, Nothing}, Dict{Union{Team, DynamicTeam}, Role}}} = Dict()
+	teamDB::Dict{Union{Context, Nothing}, Dict{Team, Vector{Dict{DataType, Any}}}} = Dict()
+	dynTeamDB::Dict{Union{Context, Nothing}, Dict{DynamicTeam, Dict{DataType, Vector}}} = Dict()
+	dynTeamsAndData::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, Dict}}} = Dict()
+	dynTeamsProp::Dict{Union{Context, Nothing}, Dict{Any, Any}} = Dict()
+end
+global roleManager = RoleManagement()
+
 """
     addMixin(context, contextualType, mixinNameSymbol)
 
@@ -12,14 +36,14 @@ Example:
     addMixin(MyContext, MyType, :MyMixin)
 """
 function addMixin(context, contextualType, mixinNameSymbol)
-	if context in keys(contextManager.mixins)
-		if contextualType in keys(contextManager.mixins[context])
-			push!(contextManager.mixins[context][contextualType], mixinNameSymbol)
+	if context in keys(roleManager.mixins)
+		if contextualType in keys(roleManager.mixins[context])
+			push!(roleManager.mixins[context][contextualType], mixinNameSymbol)
 		else
-			contextManager.mixins[context][contextualType] = [mixinNameSymbol]
+			roleManager.mixins[context][contextualType] = [mixinNameSymbol]
 		end
 	else
-		contextManager.mixins[context] = Dict((contextualType)=>[mixinNameSymbol])
+		roleManager.mixins[context] = Dict((contextualType)=>[mixinNameSymbol])
 	end
 end
 
@@ -37,14 +61,14 @@ Example:
     addTeam(MyContext, MyTeam, Dict(RoleA=>Person, RoleB=>Manager))
 """
 function addTeam(context::Union{Context, Nothing}, team, rolesAndTypes::Dict{DataType, DataType})
-	if context in keys(contextManager.teamsAndRoles)
-		if team in keys(contextManager.teamsAndRoles[context])
+	if context in keys(roleManager.teamsAndRoles)
+		if team in keys(roleManager.teamsAndRoles[context])
 			error("Context already contains team with name")
 		else
-			contextManager.teamsAndRoles[context][team] = rolesAndTypes
+			roleManager.teamsAndRoles[context][team] = rolesAndTypes
 		end
 	else
-		contextManager.teamsAndRoles[context] = Dict((team)=>rolesAndTypes)
+		roleManager.teamsAndRoles[context] = Dict((team)=>rolesAndTypes)
 	end
 end
 
@@ -65,16 +89,16 @@ Example:
     addDynamicTeam(MyContext, MyDynTeam, Dict(RoleA=>Dict(...)), :teamid, 2, 5)
 """
 function addDynamicTeam(context::Union{Context, Nothing}, team::DataType, rolesAndData::Dict{DataType, Dict{String, Any}}, id, min, max)
-	if context in keys(contextManager.dynTeamsAndData)
-		if team in keys(contextManager.dynTeamsAndData[context])
+	if context in keys(roleManager.dynTeamsAndData)
+		if team in keys(roleManager.dynTeamsAndData[context])
 			error("Context already contains team with name")
 		else
-			contextManager.dynTeamsAndData[context][team] = rolesAndData
-			contextManager.dynTeamsProp[context][team] = Dict("ID" => id, "min" => min, "max" => max)
+			roleManager.dynTeamsAndData[context][team] = rolesAndData
+			roleManager.dynTeamsProp[context][team] = Dict("ID" => id, "min" => min, "max" => max)
 		end
 	else
-		contextManager.dynTeamsAndData[context] = Dict((team)=>rolesAndData)
-		contextManager.dynTeamsProp[context] = Dict((team)=>Dict("ID" => id, "min" => min, "max" => max))
+		roleManager.dynTeamsAndData[context] = Dict((team)=>rolesAndData)
+		roleManager.dynTeamsProp[context] = Dict((team)=>Dict("ID" => id, "min" => min, "max" => max))
 	end
 end
 
@@ -94,9 +118,9 @@ Example:
     hasMixin(MyContext, obj, MyMixin)
 """
 function hasMixin(context::Context, obj, mixin::Type)
-	if obj in keys(contextManager.mixinDB)
-		if context in keys(contextManager.mixinDB[obj])
-			if mixin in [typeof(m) for m in contextManager.mixinDB[obj][context]]
+	if obj in keys(roleManager.mixinDB)
+		if context in keys(roleManager.mixinDB[obj])
+			if mixin in [typeof(m) for m in roleManager.mixinDB[obj][context]]
 				return true
 			end
 		end
@@ -113,7 +137,7 @@ Example:
     getMixins()
 """
 function getMixins()
-	contextManager.mixins
+	roleManager.mixins
 end
 
 """
@@ -128,7 +152,7 @@ Example:
     getMixins(MyType)
 """
 function getMixins(type)
-	contextManager.mixinDB[type]
+	roleManager.mixinDB[type]
 end
 
 """
@@ -144,10 +168,10 @@ Example:
     getMixins(MyContext, MyType)
 """
 function getMixins(context::Context, type)
-	if !(type in keys(contextManager.mixinDB))
+	if !(type in keys(roleManager.mixinDB))
 		return []
 	end
-	(contextManager.mixinDB[type])[context]
+	(roleManager.mixinDB[type])[context]
 end
 
 """
@@ -164,10 +188,10 @@ Example:
     getMixin(MyContext, MyType, MyMixin)
 """
 function getMixin( context::Context, type, mixin::Type)
-	if !(mixin in contextManager.mixins[context][typeof(type)])
+	if !(mixin in roleManager.mixins[context][typeof(type)])
 		error("Mixin $mixin not defined in context $context for type $(typeof(type))")
 	end
-	for m in (contextManager.mixinDB[type])[context]
+	for m in (roleManager.mixinDB[type])[context]
 		if typeof(m) == mixin
 			return m
 		end
@@ -189,8 +213,8 @@ Example:
 """
 function getObjectsOfMixin(context::Context, mixin::Type)
 	l = []
-	for obj in keys(contextManager.mixinDB)
-		for mixin_i in values(contextManager.mixinDB[obj][context])
+	for obj in keys(roleManager.mixinDB)
+		for mixin_i in values(roleManager.mixinDB[obj][context])
 			if typeof(mixin_i) == mixin
 				push!(l, obj)
 			end
@@ -214,8 +238,8 @@ Example:
 """
 function getObjectOfRole(context::Union{Context, Nothing}, team::Type, role::Type)
 	objs = []
-	for obj in keys(contextManager.roleDB)
-		for (team_i, role_i) in contextManager.roleDB[obj][context]
+	for obj in keys(roleManager.roleDB)
+		for (team_i, role_i) in roleManager.roleDB[obj][context]
 			if (typeof(role_i) == role) & (typeof(team_i) == team)
 				push!(objs, obj)
 			end
@@ -238,9 +262,9 @@ Example:
     getObjectOfRole(MyContext, MyDynTeam, Manager)
 """
 function getObjectOfRole(context::Union{Context, Nothing}, team::DynamicTeam, role::Role)
-	for obj in keys(contextManager.roleDB)
+	for obj in keys(roleManager.roleDB)
 		if context in keys(roleDB[obj])
-			if contextManager.roleDB[obj][context][team] == role
+			if roleManager.roleDB[obj][context][team] == role
 					return obj
 			end
 		end
@@ -275,9 +299,9 @@ Example:
     getObjectOfRole(MyContext, Manager)
 """
 function getObjectOfRole(context::Union{Context, Nothing}, role::Role)
-	for obj in keys(contextManager.roleDB)
-		if context in keys(contextManager.roleDB[obj])
-			for role_i in values(contextManager.roleDB[obj][context])
+	for obj in keys(roleManager.roleDB)
+		if context in keys(roleManager.roleDB[obj])
+			for role_i in values(roleManager.roleDB[obj][context])
 				if role_i == role
 					return obj
 				end
@@ -314,16 +338,16 @@ Example:
     getObjectsOfRole(MyContext, MyDynTeam, Manager)
 """
 function getObjectsOfRole(context::Union{Context, Nothing}, team::DynamicTeam, role::Type)
-	if !(context in keys(contextManager.dynTeamDB))
+	if !(context in keys(roleManager.dynTeamDB))
 		return []
 	end
-	if !(team in keys(contextManager.dynTeamDB[context]))
+	if !(team in keys(roleManager.dynTeamDB[context]))
 		return []
 	end
-	if !(role in keys(contextManager.dynTeamDB[context][team]))
+	if !(role in keys(roleManager.dynTeamDB[context][team]))
 		return []
 	end
-	contextManager.dynTeamDB[context][team][role]
+	roleManager.dynTeamDB[context][team][role]
 end
 """
     getObjectsOfRole(team::DynamicTeam, role::Type)
@@ -358,7 +382,7 @@ Example:
     hasRole(MyContext, obj, Manager, MyTeam)
 """
 function hasRole(context::Union{Context, Nothing}, obj, role::Type, team::Team)
-	#if role in typeof.(collect(keys(contextManager.roleDB[obj][context][team])))
+	#if role in typeof.(collect(keys(roleManager.roleDB[obj][context][team])))
 	for concreteRole in getRoles(context, obj, team)
 		if typeof(concreteRole) == role
 			return true
@@ -463,12 +487,12 @@ Example:
 """
 function getRoles(context::Union{Context, Nothing}, obj, role::Type, teamType::Type)
 	roles = []
-	if !(obj in keys(contextManager.roleDB))
+	if !(obj in keys(roleManager.roleDB))
 		return []
 	end
-	for team in keys(contextManager.roleDB[obj][context])
+	for team in keys(roleManager.roleDB[obj][context])
 		if typeof(team) == teamType
-			concreteRole = contextManager.roleDB[obj][context][team]
+			concreteRole = roleManager.roleDB[obj][context][team]
 			if typeof(concreteRole) == role
 				push!(roles, concreteRole)
 			end
@@ -492,8 +516,8 @@ Example:
 """
 function getRoles(context::Union{Context, Nothing}, obj, role::Type)
 	roles = []
-	for team in contextManager.roleDB[obj][context]
-		concreteRole = contextManager.roleDB[obj][context][team]
+	for team in roleManager.roleDB[obj][context]
+		concreteRole = roleManager.roleDB[obj][context][team]
 		if typeof(concreteRole) == role
 			push!(roles, concreteRole)
 		end
@@ -515,14 +539,14 @@ Example:
     getRole(MyContext, obj, MyDynTeam)
 """
 function getRole(context::Union{Context, Nothing}, obj::T, team::DynamicTeam) where T
-	if !(haskey(contextManager.roleDB, obj))
+	if !(haskey(roleManager.roleDB, obj))
 		return nothing
-	elseif !(haskey(contextManager.roleDB[obj], context))
+	elseif !(haskey(roleManager.roleDB[obj], context))
 		return nothing
-	elseif !(haskey(contextManager.roleDB[obj][context], team))
+	elseif !(haskey(roleManager.roleDB[obj][context], team))
 		return nothing
 	end
-	contextManager.roleDB[obj][context][team]
+	roleManager.roleDB[obj][context][team]
 end
 
 """
@@ -554,8 +578,8 @@ Example:
     getRoles(MyContext, obj)
 """
 function getRoles(context::Union{Context, Nothing}, obj)
-	if haskey(contextManager.roleDB, obj)
-		return contextManager.roleDB[obj][context]
+	if haskey(roleManager.roleDB, obj)
+		return roleManager.roleDB[obj][context]
 	end
 	return nothing
 end
@@ -572,8 +596,8 @@ Example:
     getRoles(obj)
 """
 function getRoles(obj)
-	if haskey(contextManager.roleDB, obj)
-		return contextManager.roleDB[obj]
+	if haskey(roleManager.roleDB, obj)
+		return roleManager.roleDB[obj]
 	end
 	return nothing
 end
@@ -591,7 +615,7 @@ Example:
     getRolesOfTeam(MyContext, MyTeam)
 """
 function getRolesOfTeam(context::Union{Context, Nothing}, team::Team)
-	contextManager.teamDB[context][team]
+	roleManager.teamDB[context][team]
 end
 
 """
@@ -606,7 +630,7 @@ Example:
     getRolesOfTeam(MyTeam)
 """
 function getRolesOfTeam(team::Team)
-	contextManager.teamDB[nothing][team]
+	roleManager.teamDB[nothing][team]
 end
 
 """
@@ -622,7 +646,7 @@ Example:
     getRolesOfTeam(MyContext, MyDynTeam)
 """
 function getRolesOfTeam(context::Union{Context, Nothing}, team::DynamicTeam)
-	contextManager.dynTeamDB[context][team]
+	roleManager.dynTeamDB[context][team]
 end
 
 """
@@ -637,7 +661,7 @@ Example:
     getRolesOfTeam(MyDynTeam)
 """
 function getRolesOfTeam(team::DynamicTeam)
-	contextManager.dynTeamDB[nothing][team]
+	roleManager.dynTeamDB[nothing][team]
 end
 
 """
@@ -655,10 +679,10 @@ Example:
 """
 function getTeam(context::Union{Context, Nothing}, teamType::Type, rolePairs...)
 	teams = []
-	if !(context in keys(contextManager.teamDB))
+	if !(context in keys(roleManager.teamDB))
 		return nothing
 	end
-	for (team, rolesObjs ) in contextManager.teamDB[context]
+	for (team, rolesObjs ) in roleManager.teamDB[context]
 		roleDict = Dict(rolePairs...)
 		if roleDict in rolesObjs
 			return team
@@ -680,12 +704,12 @@ Example:
     getDynamicTeam(MyContext, Manager)
 """
 function getDynamicTeam(context::Union{Context, Nothing}, role::Role)
-	if !(context in keys(contextManager.dynTeamDB))
+	if !(context in keys(roleManager.dynTeamDB))
 		return nothing
 	end
-	for obj in keys(contextManager.roleDB)
-		for team in keys(contextManager.roleDB[obj][context])
-			if contextManager.roleDB[obj][context][team] == role
+	for obj in keys(roleManager.roleDB)
+		for team in keys(roleManager.roleDB[obj][context])
+			if roleManager.roleDB[obj][context][team] == role
 				return team
 			end
 		end
@@ -721,7 +745,7 @@ Example:
     getDynamicTeamID(MyContext, MyDynTeam)
 """
 function getDynamicTeamID(context::Union{Context, Nothing}, team::DynamicTeam)
-	contextManager.dynTeamsProp[context][team]
+	roleManager.dynTeamsProp[context][team]
 end
 
 """
@@ -736,7 +760,7 @@ Example:
     getDynamicTeamID(MyDynTeam)
 """
 function getDynamicTeamID(team::DynamicTeam)
-	contextManager.dynTeamsProp[nothing][team]
+	roleManager.dynTeamsProp[nothing][team]
 end
 
 """
@@ -753,8 +777,8 @@ Example:
     getDynamicTeam(MyContext, MyDynTeam, :teamid, 123)
 """
 function getDynamicTeam(context::Union{Context, Nothing}, teamType::DataType, id::T) where T
-	d = get!(contextManager.dynTeamDB, context, Dict())
-	idName = contextManager.dynTeamsProp[context][teamType]["ID"]
+	d = get!(roleManager.dynTeamDB, context, Dict())
+	idName = roleManager.dynTeamsProp[context][teamType]["ID"]
 	for team in keys(d)
 		if typeof(team) == teamType
 			if getfield(team, idName) == id
@@ -794,11 +818,11 @@ Example:
     getDynamicTeams(MyContext, MyDynTeam)
 """
 function getDynamicTeams(context::Union{Context, Nothing}, teamType::Type)
-	if !(context in keys(contextManager.dynTeamDB))
+	if !(context in keys(roleManager.dynTeamDB))
 		return nothing
 	end
 	teams = []
-	for team in keys(contextManager.dynTeamDB[context])
+	for team in keys(roleManager.dynTeamDB[context])
 		if typeof(team) == teamType
 			push!(teams, team)
 		end
@@ -838,7 +862,7 @@ Example:
     getTeamPartners(ctx, alice, Manager, MyTeam)
 """
 function getTeamPartners(context::Union{Context, Nothing}, obj::Any, roleType::Type, team::Team)
-	groups = contextManager.teamDB[context][team]
+	groups = roleManager.teamDB[context][team]
 	partners = Dict()
 	for group in groups
 		if roleType in keys(group)
@@ -874,9 +898,9 @@ Example:
 """
 function getTeamPartners(context::Union{Context, Nothing}, obj::Any, roleType::Type, teamType::Type)
 	groups = []
-	for team in contextManager.teamDB[context]
+	for team in roleManager.teamDB[context]
 		if typeof(team[1]) == teamType
-			push!(groups, (contextManager.teamDB[context][team[1]])...)
+			push!(groups, (roleManager.teamDB[context][team[1]])...)
 		end
 	end
 	partners = []

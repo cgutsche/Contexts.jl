@@ -15,7 +15,7 @@ Example:
 """
 function Base.:(<<)(mixin::DataType, type::DataType)
 	if mixin <: Mixin
-		for entry in values(contextManager.mixins)
+		for entry in values(roleManager.mixins)
 			for (key, list) in entry
 				if (key == type) & (mixin in list)
 					return true
@@ -23,7 +23,7 @@ function Base.:(<<)(mixin::DataType, type::DataType)
 			end
 		end
 	elseif mixin <: Role
-		for entry in values(contextManager.teamsAndRoles)
+		for entry in values(roleManager.teamsAndRoles)
 			for teamEntry in values(entry)
 				for (key, value) in teamEntry
 					if (key == mixin) & (value == type)
@@ -51,22 +51,22 @@ Example:
 function assignMixin(context::Context, pair::Pair)
 	type = pair[1]
 	mixin = pair[2]
-	if !(typeof(mixin) in contextManager.mixins[context][typeof(type)])
+	if !(typeof(mixin) in roleManager.mixins[context][typeof(type)])
 		error("Mixin $mixin can not be assigned to Type $type")
 	end
-	if type in keys(contextManager.mixinDB)
-		if context in keys(contextManager.mixinDB[type])
-			push!(contextManager.mixinDB[type][context], mixin)
+	if type in keys(roleManager.mixinDB)
+		if context in keys(roleManager.mixinDB[type])
+			push!(roleManager.mixinDB[type][context], mixin)
 		else
-			contextManager.mixinDB[type][context] = [mixin]
+			roleManager.mixinDB[type][context] = [mixin]
 		end
 	else
-		contextManager.mixinDB[type] = Dict(context => [mixin])
+		roleManager.mixinDB[type] = Dict(context => [mixin])
 	end
-	if type in keys(contextManager.mixinTypeDB)
-		contextManager.mixinTypeDB[type][context] = typeof(mixin)
+	if type in keys(roleManager.mixinTypeDB)
+		roleManager.mixinTypeDB[type][context] = typeof(mixin)
 	else
-		contextManager.mixinTypeDB[type] = Dict(context => typeof(mixin))
+		roleManager.mixinTypeDB[type] = Dict(context => typeof(mixin))
 	end
 end
 
@@ -85,13 +85,13 @@ Example:
 function disassignMixin(context::Context, pair::Pair)
 	type = pair[1]
 	mixin = pair[2]
-	if type in keys(contextManager.mixinDB)
-		delete!(contextManager.mixinDB[type], context)
+	if type in keys(roleManager.mixinDB)
+		delete!(roleManager.mixinDB[type], context)
 	else
 		error("Mixin is not assigned to type "*repr(type))
 	end
-	if type in keys(contextManager.mixinTypeDB)
-		delete!(contextManager.mixinTypeDB[type], context)
+	if type in keys(roleManager.mixinTypeDB)
+		delete!(roleManager.mixinTypeDB[type], context)
 	else
 		error("Mixin is not assigned to type "*repr(type))
 	end
@@ -319,9 +319,9 @@ Example:
     changeRoles(ctx, team, [(obj1, RoleA)], [(obj2, RoleB)])
 """
 function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Any}, roleDisassignment::Vector{Pair{T, DataType}}) where T
-	roles = contextManager.dynTeamDB[context][team]
-	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
-	teamProps = contextManager.dynTeamsProp[context][typeof(team)]
+	roles = roleManager.dynTeamDB[context][team]
+	roleProps = roleManager.dynTeamsAndData[context][typeof(team)]
+	teamProps = roleManager.dynTeamsProp[context][typeof(team)]
 	count = sum(length(v) for v in values(roles))
 	#disassignmentsDict = Dict{DataType, Int64}([r[2] => 0 for r in roleDisassignment])
 	disassignmentsDict = Dict{DataType, Int64}()
@@ -353,23 +353,23 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 		role = rolePair[2]
 		obj = rolePair[1]
 		roleObj = getRole(context, obj, team)
-		if haskey(contextManager.roleDB, roleObj)
+		if haskey(roleManager.roleDB, roleObj)
 			error("Role $(roleObj) plays another role. You must diassign it before dissolving the team.")
 		end
-		get!(get!(contextManager.roleDB, obj, Dict()), context, Dict())
-		if !(haskey(contextManager.roleDB[obj][context], team))
+		get!(get!(roleManager.roleDB, obj, Dict()), context, Dict())
+		if !(haskey(roleManager.roleDB[obj][context], team))
 			error("$obj does not play role $role in team $team.")
 		end
-		if isa(contextManager.roleDB[obj][context][team], role)
-			delete!(contextManager.roleDB[obj][context], team)
+		if isa(roleManager.roleDB[obj][context][team], role)
+			delete!(roleManager.roleDB[obj][context], team)
 		else
 			error("$obj does not play role $role.")
 		end
 		filter!(x -> x != obj, roles[role])
-		if isempty(contextManager.roleDB[obj][context])
-			delete!(contextManager.roleDB[obj], context)
-			if isempty(contextManager.roleDB[obj])
-			delete!(contextManager.roleDB, obj)
+		if isempty(roleManager.roleDB[obj][context])
+			delete!(roleManager.roleDB[obj], context)
+			if isempty(roleManager.roleDB[obj])
+			delete!(roleManager.roleDB, obj)
 			end
 		end
 	end
@@ -390,9 +390,9 @@ Example:
     changeRoles(ctx, team, [(obj1, RoleA)], [obj2])
 """
 function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Pair{T, R}}, roleDisassignment::Vector{Any}) where T where R <: Role
-	roles = contextManager.dynTeamDB[context][team]
-	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
-	teamProps = contextManager.dynTeamsProp[context][typeof(team)]
+	roles = roleManager.dynTeamDB[context][team]
+	roleProps = roleManager.dynTeamsAndData[context][typeof(team)]
+	teamProps = roleManager.dynTeamsProp[context][typeof(team)]
 	count = sum(length(v) for v in values(roles))
 	#assignmentsDict = Dict{DataType, Int64}([typeof(r[2]) => 0 for r in roleAssignment])
 	assignmentsDict = Dict{DataType, Int64}()
@@ -424,10 +424,10 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 	for rolePair in roleAssignment
 		role = rolePair[2]
 		obj = rolePair[1]
-		if !(isa(obj, contextManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"]))
+		if !(isa(obj, roleManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"]))
 			error("Role $(typeof(role)) can not be assigned to Type $(typeof(obj))")
 		end
-		d = get!(get!(contextManager.roleDB, obj, Dict()), context, Dict())
+		d = get!(get!(roleManager.roleDB, obj, Dict()), context, Dict())
 		if haskey(d, team)
 			error("$obj already plays role in team $team.")
 		end
@@ -451,9 +451,9 @@ Example:
     changeRoles(ctx, team, [(obj1, RoleA)], [(obj2, RoleB)])
 """
 function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAssignment::Vector{Pair{T1, R}}, roleDisassignment::Vector{Pair{T2, DataType}}) where T1 where T2 where R <: Role
-	roles = contextManager.dynTeamDB[context][team]
-	roleProps = contextManager.dynTeamsAndData[context][typeof(team)]
-	teamProps = contextManager.dynTeamsProp[context][typeof(team)]
+	roles = roleManager.dynTeamDB[context][team]
+	roleProps = roleManager.dynTeamsAndData[context][typeof(team)]
+	teamProps = roleManager.dynTeamsProp[context][typeof(team)]
 	count = sum(length(v) for v in values(roles))
 	#assignmentsDict = Dict{DataType, Int64}([typeof(r[2]) => 0 for r in roleAssignment])
 	assignmentsDict = Dict{DataType, Int64}()
@@ -493,24 +493,24 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 		role = rolePair[2]
 		obj = rolePair[1]
 		roleObj = getRole(context, obj, team)
-		if haskey(contextManager.roleDB, roleObj)
+		if haskey(roleManager.roleDB, roleObj)
 			error("Role $(roleObj) plays another role. You must diassign it before dissolving the team.")
 		end
-		get!(get!(contextManager.roleDB, obj, Dict()), context, Dict())
-		if !(haskey(contextManager.roleDB[obj][context], team))
+		get!(get!(roleManager.roleDB, obj, Dict()), context, Dict())
+		if !(haskey(roleManager.roleDB[obj][context], team))
 			error("$obj does not play role $role in team $team.")
 		end
-		if isa(contextManager.roleDB[obj][context][team], role)
-			delete!(contextManager.roleDB[obj][context], team)
+		if isa(roleManager.roleDB[obj][context][team], role)
+			delete!(roleManager.roleDB[obj][context], team)
 		else
 			error("$obj does not play role $role.")
 		end
-		#filter!(x -> x != obj, contextManager.dynTeamDB[context][team][role])
+		#filter!(x -> x != obj, roleManager.dynTeamDB[context][team][role])
 		deleteat!(roles[role], findfirst(isequal(obj), roles[role]))
-		if isempty(contextManager.roleDB[obj][context])
-			delete!(contextManager.roleDB[obj], context)
-			if isempty(contextManager.roleDB[obj])
-			delete!(contextManager.roleDB, obj)
+		if isempty(roleManager.roleDB[obj][context])
+			delete!(roleManager.roleDB[obj], context)
+			if isempty(roleManager.roleDB[obj])
+			delete!(roleManager.roleDB, obj)
 			end
 		end
 	end
@@ -518,10 +518,10 @@ function changeRoles(context::Union{Context, Nothing}, team::DynamicTeam, roleAs
 	for rolePair in roleAssignment
 		role = rolePair[2]
 		obj = rolePair[1]
-		if !(isa(obj, contextManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"]))
+		if !(isa(obj, roleManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"]))
 			error("Role $(typeof(role)) can not be assigned to Type $(typeof(obj))")
 		end
-		d = get!(get!(contextManager.roleDB, obj, Dict()), context, Dict())
+		d = get!(get!(roleManager.roleDB, obj, Dict()), context, Dict())
 		if haskey(d, team)
 			error("$obj already plays role in team $team.")
 		end
@@ -552,7 +552,7 @@ function assignRoles(context::Union{Context, Nothing}, team::Team, roles...)
 		error("Team $(typeof(team)) is already assigned with the roles $roles")
 	end
 
-	roleList = collect(keys(contextManager.teamsAndRoles[context][typeof(team)]))
+	roleList = collect(keys(roleManager.teamsAndRoles[context][typeof(team)]))
 	for type in roleTypes
 		if !(type[1] in roleList)
 			error("Team must be assigned with all roles being played exactly once.")
@@ -567,25 +567,25 @@ function assignRoles(context::Union{Context, Nothing}, team::Team, roles...)
 	for rolePair in roles
 		obj = rolePair[1]
 		role = rolePair[2]
-		if !(typeof(obj) == contextManager.teamsAndRoles[context][typeof(team)][typeof(role)])
+		if !(typeof(obj) == roleManager.teamsAndRoles[context][typeof(team)][typeof(role)])
 			error("Role $(typeof(role)) can not be assigned to Type $(typeof(obj))")
 		end
-		if !(obj in keys(contextManager.roleDB))
-			contextManager.roleDB[obj] = Dict()
+		if !(obj in keys(roleManager.roleDB))
+			roleManager.roleDB[obj] = Dict()
 		end
-		if !(context in keys(contextManager.roleDB[obj]))
-			contextManager.roleDB[obj][context] = Dict()
+		if !(context in keys(roleManager.roleDB[obj]))
+			roleManager.roleDB[obj][context] = Dict()
 		end
-		contextManager.roleDB[obj][context][team] = role
+		roleManager.roleDB[obj][context][team] = role
 	end
 
-	if !(context in keys(contextManager.teamDB))
-		contextManager.teamDB[context] = Dict()
+	if !(context in keys(roleManager.teamDB))
+		roleManager.teamDB[context] = Dict()
 	end
-	if !(team in keys(contextManager.teamDB[context]))
-		contextManager.teamDB[context][team] = [Dict(roleTypes...)]
+	if !(team in keys(roleManager.teamDB[context]))
+		roleManager.teamDB[context][team] = [Dict(roleTypes...)]
 	else
-		push!(contextManager.teamDB[context][team], Dict(roleTypes...))
+		push!(roleManager.teamDB[context][team], Dict(roleTypes...))
 	end
 	team
 end
@@ -604,14 +604,14 @@ Example:
     assignRoles(ctx, team, obj1 => RoleA, obj2 => RoleB)
 """
 function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles...)
-	roleTypes = Dict([r => Vector{contextManager.dynTeamsAndData[context][typeof(team)][r]["natType"]}() for r in keys(contextManager.dynTeamsAndData[context][typeof(team)])]...)
+	roleTypes = Dict([r => Vector{roleManager.dynTeamsAndData[context][typeof(team)][r]["natType"]}() for r in keys(roleManager.dynTeamsAndData[context][typeof(team)])]...)
 	for pair in roles
 		push!(roleTypes[typeof(pair[2])], pair[1])
 	end
 
-	roleCnt = Dict([r => 0 for r in keys(contextManager.dynTeamsAndData[context][typeof(team)])]...)
+	roleCnt = Dict([r => 0 for r in keys(roleManager.dynTeamsAndData[context][typeof(team)])]...)
 	for type in roleTypes
-		if !(type[1] in keys(contextManager.dynTeamsAndData[context][typeof(team)]))
+		if !(type[1] in keys(roleManager.dynTeamsAndData[context][typeof(team)]))
 			error("Dynamic team must be assigned with all roles being played within the cardinality they are defined with.")
 		else
 			roleCnt[type[1]] += length(type[2])
@@ -619,7 +619,7 @@ function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles.
 	end
 
 	totalCount = sum(values(roleCnt))
-	teamProps = contextManager.dynTeamsProp[context][typeof(team)]
+	teamProps = roleManager.dynTeamsProp[context][typeof(team)]
 	if teamProps["min"] > totalCount
 		error("Set minimum assigned roles is $(teamProps["min"]), current is $(totalCount).")
 	end
@@ -627,8 +627,8 @@ function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles.
 		error("Set maximum assigned roles is $(teamProps["max"]), current is $(totalCount).")
 	end
 	for (r, c) in roleCnt
-		minimum = contextManager.dynTeamsAndData[context][typeof(team)][r]["min"]
-		maximum = contextManager.dynTeamsAndData[context][typeof(team)][r]["max"]
+		minimum = roleManager.dynTeamsAndData[context][typeof(team)][r]["min"]
+		maximum = roleManager.dynTeamsAndData[context][typeof(team)][r]["max"]
 		if !(minimum <= c <= maximum)
 			error("Dynamic team must be assigned with all roles being played within the cardinality they are defined with.")
 		end
@@ -637,22 +637,22 @@ function assignRoles(context::Union{Context, Nothing}, team::DynamicTeam, roles.
 	for rolePair in roles
 		obj = rolePair[1]
 		role = rolePair[2]
-		if !(typeof(obj) <: contextManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"])
+		if !(typeof(obj) <: roleManager.dynTeamsAndData[context][typeof(team)][typeof(role)]["natType"])
 			error("Role $(typeof(role)) can not be assigned to Type $(typeof(obj))")
 		end
-		if !(obj in keys(contextManager.roleDB))
-			contextManager.roleDB[obj] = Dict()
+		if !(obj in keys(roleManager.roleDB))
+			roleManager.roleDB[obj] = Dict()
 		end
-		if !(context in keys(contextManager.roleDB[obj]))
-			contextManager.roleDB[obj][context] = Dict()
+		if !(context in keys(roleManager.roleDB[obj]))
+			roleManager.roleDB[obj][context] = Dict()
 		end
-		contextManager.roleDB[obj][context][team] = role
+		roleManager.roleDB[obj][context][team] = role
 	end
 
-	if !(context in keys(contextManager.dynTeamDB))
-		contextManager.dynTeamDB[context] = Dict()
+	if !(context in keys(roleManager.dynTeamDB))
+		roleManager.dynTeamDB[context] = Dict()
 	end
-	contextManager.dynTeamDB[context][team] = Dict(roleTypes)
+	roleManager.dynTeamDB[context][team] = Dict(roleTypes)
 	team
 end
 
@@ -671,10 +671,10 @@ Example:
 """
 function disassignRoles(context::Union{Context, Nothing}, t::Team, roles::Pair...)
 	teamType = typeof(t)
-	if !(context in keys(contextManager.teamDB))
+	if !(context in keys(roleManager.teamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
 	end
-	if !(teamType in typeof.(keys(contextManager.teamDB[context])))
+	if !(teamType in typeof.(keys(roleManager.teamDB[context])))
 		error("Team $teamType is not defined in context $(context)")
 	end
 	rolesMirrored = []
@@ -683,26 +683,26 @@ function disassignRoles(context::Union{Context, Nothing}, t::Team, roles::Pair..
 		role = rolePair[1]
 		obj = rolePair[2]
 		push!(rolesMirrored, role=>obj)
-		if !(obj in keys(contextManager.roleDB))
+		if !(obj in keys(roleManager.roleDB))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		if !(context in keys(contextManager.roleDB[obj]))
+		if !(context in keys(roleManager.roleDB[obj]))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		if !(teamType in typeof.(keys(contextManager.roleDB[obj][context])))
+		if !(teamType in typeof.(keys(roleManager.roleDB[obj][context])))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		delete!(contextManager.roleDB[obj][context], team)
-		if isempty(contextManager.roleDB[obj][context])
-			delete!(contextManager.roleDB[obj], context)
-			if isempty(contextManager.roleDB[obj])
-			delete!(contextManager.roleDB, obj)
+		delete!(roleManager.roleDB[obj][context], team)
+		if isempty(roleManager.roleDB[obj][context])
+			delete!(roleManager.roleDB[obj], context)
+			if isempty(roleManager.roleDB[obj])
+			delete!(roleManager.roleDB, obj)
 			end
 		end
 	end
-	for (i, roleGroup) in enumerate(contextManager.teamDB[context][team])
+	for (i, roleGroup) in enumerate(roleManager.teamDB[context][team])
 		if roleGroup == Dict(rolesMirrored...)
-			deleteat!(contextManager.teamDB[context][team], i)
+			deleteat!(roleManager.teamDB[context][team], i)
 			break
 		end
 	end	
@@ -722,10 +722,10 @@ Example:
     disassignRoles(ctx, TeamType, RoleA => obj1)
 """
 function disassignRoles(context::Union{Context, Nothing}, teamType::Type, roles::Pair...)
-	if !(context in keys(contextManager.teamDB))
+	if !(context in keys(roleManager.teamDB))
 		error("No team is assigned context $(context) is not assigned to context $(context)")
 	end
-	if !(teamType in typeof.(keys(contextManager.teamDB[context])))
+	if !(teamType in typeof.(keys(roleManager.teamDB[context])))
 		error("Team $teamType is not defined in context $(context)")
 	end
 	rolesMirrored = []
@@ -734,26 +734,26 @@ function disassignRoles(context::Union{Context, Nothing}, teamType::Type, roles:
 		role = rolePair[1]
 		obj = rolePair[2]
 		push!(rolesMirrored, role=>obj)
-		if !(obj in keys(contextManager.roleDB))
+		if !(obj in keys(roleManager.roleDB))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		if !(context in keys(contextManager.roleDB[obj]))
+		if !(context in keys(roleManager.roleDB[obj]))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		if !(teamType in typeof.(keys(contextManager.roleDB[obj][context])))
+		if !(teamType in typeof.(keys(roleManager.roleDB[obj][context])))
 			error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 		end
-		delete!(contextManager.roleDB[obj][context], team)
-		if isempty(contextManager.roleDB[obj][context])
-			delete!(contextManager.roleDB[obj], context)
-			if isempty(contextManager.roleDB[obj])
-			delete!(contextManager.roleDB, obj)
+		delete!(roleManager.roleDB[obj][context], team)
+		if isempty(roleManager.roleDB[obj][context])
+			delete!(roleManager.roleDB[obj], context)
+			if isempty(roleManager.roleDB[obj])
+			delete!(roleManager.roleDB, obj)
 			end
 		end
 	end
-	for (i, roleGroup) in enumerate(contextManager.teamDB[context][team])
+	for (i, roleGroup) in enumerate(roleManager.teamDB[context][team])
 		if roleGroup == Dict(rolesMirrored...)
-			deleteat!(contextManager.teamDB[context][team], i)
+			deleteat!(roleManager.teamDB[context][team], i)
 			break
 		end
 	end	
@@ -772,41 +772,41 @@ Example:
     disassignRoles(ctx, team)
 """
 function disassignRoles(context::Union{Context, Nothing}, team::DynamicTeam)
-	if team in keys(contextManager.roleDB)
+	if team in keys(roleManager.roleDB)
 		error("Team $(team) is currently playing a role. You must disassign it before dissolving the team.")
 	end
-	roles = contextManager.dynTeamDB[context][team]
+	roles = roleManager.dynTeamDB[context][team]
 	for rolePair in roles
 		role = rolePair[1]
 		objs = rolePair[2]
 		for obj in objs
 			for c in getContexts()
 				roleObj = getRole(c, obj, team)
-				if roleObj in keys(contextManager.roleDB)
+				if roleObj in keys(roleManager.roleDB)
 					error("Role $(roleObj) plays another role. You must diassign it before dissolving the team.")
 				end
 			end											
-			if !(obj in keys(contextManager.roleDB))
+			if !(obj in keys(roleManager.roleDB))
 				error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 			end
-			if !(context in keys(contextManager.roleDB[obj]))
+			if !(context in keys(roleManager.roleDB[obj]))
 				error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 			end
-			if !(typeof(team) in typeof.(keys(contextManager.roleDB[obj][context])))
+			if !(typeof(team) in typeof.(keys(roleManager.roleDB[obj][context])))
 				error("Role $role is not assigned to $(repr(obj)) in context $(context)")
 			end
-			delete!(contextManager.roleDB[obj][context], team)
-			if isempty(contextManager.roleDB[obj][context])
-				delete!(contextManager.roleDB[obj], context)
-				if isempty(contextManager.roleDB[obj])
-					delete!(contextManager.roleDB, obj)
+			delete!(roleManager.roleDB[obj][context], team)
+			if isempty(roleManager.roleDB[obj][context])
+				delete!(roleManager.roleDB[obj], context)
+				if isempty(roleManager.roleDB[obj])
+					delete!(roleManager.roleDB, obj)
 				end
 			end
 		end
 	end
-	delete!(contextManager.dynTeamDB[context], team)
-	if isempty(contextManager.dynTeamDB[context])
-		delete!(contextManager.roleDB, context)
+	delete!(roleManager.dynTeamDB[context], team)
+	if isempty(roleManager.dynTeamDB[context])
+		delete!(roleManager.roleDB, context)
 	end
 end
 
