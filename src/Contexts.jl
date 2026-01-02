@@ -21,7 +21,7 @@ export CompiledPetriNet, PetriNet, Place, Transition, NormalArc, InhibitorArc, T
 export @ContextStateMachine, ContextStateMachine
 
 include("ContextualPNCalculation.jl")
-export runPN
+export runPN, runPNInf
 
 include("ContextPNRules.jl")
 export exclusion, weakExclusion, directedExclusion, strongInclusion, weakInclusion, requirement, alternative

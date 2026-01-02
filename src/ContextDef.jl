@@ -42,7 +42,7 @@ macro newContext(contextName)
 end
 
 """
-    ContextGroup(subContexts::Context...)
+    ContextGroup(subContexts::Context...; name::Symbol)
 
 Creates a group of contexts, allowing alternative activation, meaning exactly one 
 context of the grouped contexts must be active.
@@ -51,15 +51,33 @@ Returns a `ContextGroup` object containing the provided contexts.
 	Calling the `ContextGroup` object returns the currently active context in the group.
 """
 function ContextGroup(subContexts::Context...)
+	function makefun()
+		quote
+			getActiveContext = () -> begin
+				$( [:( isActive($c) && return $c ) for c in subContexts]... )
+				return nothing
+			end
+		end |> eval
+	end
+	makefun()
+	contextSet = Set([subContexts...])
+	group = ContextGroup(contextSet, getActiveContext)
+	for context in subContexts
+		if !(context in keys(contextRuleManager.groups))
+			contextRuleManager.groups[context] = group
+		else
+			error("Context $context is already part of another ContextGroup.")
+		end
+	end
 	alternative(subContexts...)
-	ContextGroup([subContexts...])
+	return group
 end
 """
     (contextGroup::ContextGroup)()
 
 Returns the currently active context from the group.
 """
-(contextGroup::ContextGroup)() = filter(subContext -> isActive(subContext), contextGroup.subContexts)[1]
+(contextGroup::ContextGroup)() = contextGroup.getActiveContext()#only(filter(isActive, contextGroup.subContexts)) #filter(subContext -> isActive(subContext), contextGroup.subContexts)[1]
 
 """
     struct ContextStateMachine

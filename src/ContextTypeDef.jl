@@ -68,7 +68,8 @@ Example:
     ContextGroup([ctx1, ctx2])
 """
 struct ContextGroup
-    subContexts::Vector{Context}
+    subContexts::Set{Context}
+    getActiveContext::Function
 end
 
 #### Context rule (condition) regarded type definitions ####

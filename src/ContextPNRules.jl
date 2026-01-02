@@ -49,6 +49,7 @@ Saves a list of all context constraints and rules.
 """
 @with_kw mutable struct ContextRuleManagement
     constraints::Vector{Constraint} = []
+	groups::Dict{Context, ContextGroup} = Dict()
 end
 
 contextRuleManager = ContextRuleManagement()
@@ -179,7 +180,7 @@ Arguments:
 
 Returns `true` after creating and adding the Petri net rule.
 """
-function directedExclusion(p::Pair{T1, T2}; priority::Int=1) where {T1, T2 <: Context}
+function directedExclusion(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Context, T2 <: Union{AbstractContext}}
 	c1 = p[1]
 	c2 = p[2]
 	p1 = Place("p", 0)
@@ -261,7 +262,7 @@ function strongInclusion(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Union{Or
 
 	pn = PetriNet([p1], [t1, t2, t3], arcs)
 	addPNToControlPN(pn; priority=priority)
-	addConstraint(Inclusion([c1, c2]))
+	addConstraint(Inclusion(c1 => c2))
 	true
 end
 
@@ -273,7 +274,7 @@ If second becomes inactive, first is forced to deactivate.
 
 Arguments:
 - `p`: A Pair where first element must be a Context, second can be Context or ContextRule
-
+ö
 Returns `true` after creating and adding the Petri net rule.
 """
 function requirement(p::Pair{T1, T2}; priority::Int=1) where {T1 <: Context, T2 <: Union{AbstractContext}}
@@ -312,7 +313,7 @@ function alternative(contexts::Context...; priority::Int=1)
 	end
 	for c in contexts
 		if length(filter(x -> c==x, contexts)) > 1
-			error("alternative() contains $c more thean once.")
+			error("alternative() contains $c more than once.")
 		end
 	end
 
