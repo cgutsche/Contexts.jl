@@ -52,19 +52,20 @@ Returns a `ContextGroup` object containing the provided contexts.
 """
 function ContextGroup(subContexts::Context...)
 	function makefun()
-		quote
-			getActiveContext = () -> begin
+		getActiveContext = quote
+			() -> begin
 				$( [:( isActive($c) && return $c ) for c in subContexts]... )
 				return nothing
 			end
 		end |> eval
+		return getActiveContext
 	end
 	for c in subContexts
 		if c in keys(contextRuleManager.groups)
 			error("Context $c is already part of another ContextGroup.")
 		end
 	end
-	makefun()
+	getActiveContext = makefun()
 	contextSet = Set([subContexts...])
 	group = ContextGroup(contextSet, getActiveContext)
 	for context in subContexts
