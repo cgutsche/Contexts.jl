@@ -5,7 +5,7 @@
 """
 function __contextManagement()
 	contexts::Vector{Context} = []
-	activeContexts::Vector{Context} = []
+	activeContexts::Set{Context} = Set{Context}([])
 	function addContext(context::Context)
 		push!(contexts, context)
 		true
@@ -30,19 +30,22 @@ function __contextManagement()
 		true
 	end
 	function deactivateContext(context::T) where {T <: Context}
-		deleteat!(activeContexts, findall(x->x==context, activeContexts))
+		deactivateContextWithoutPN(context)
 		for pn in getCompiledControlPN()
 			runPN(pn)
 		end
 		true
 	end
 	function deactivateContextWithoutPN(context::T) where {T <: Context}
-		deleteat!(activeContexts, findall(x->x==context, activeContexts))
+		delete!(activeContexts, context)
 		true
 	end
 	function deactivateAllContexts()
-		activeContexts = []
+		empty!(activeContexts)
 		true
+	end
+	function isActive(context::Context)
+		context in activeContexts
 	end
 	return (
 		getContexts,
@@ -52,7 +55,8 @@ function __contextManagement()
 		activateContextWithoutPN,
 		deactivateContext,
 		deactivateContextWithoutPN,
-		deactivateAllContexts
+		deactivateAllContexts,
+		isActive
 	)
 end
 
@@ -145,7 +149,8 @@ const getContexts,
 	  activateContextWithoutPN,
 	  deactivateContext,
 	  deactivateContextWithoutPN,
-	  deactivateAllContexts = __contextManagement()
+	  deactivateAllContexts,
+	  __isActive = __contextManagement()
 
 
 """
@@ -205,7 +210,9 @@ Should be used with caution as it does not run PetriNet logic.
 Checks if a context is currently active.
 Returns `true` if active, `false` otherwise.
 """
+
 function isActive(context::Context)
-	context in getActiveContexts()
+	__isActive(context)
+	#context in getActiveContexts()
 end
 

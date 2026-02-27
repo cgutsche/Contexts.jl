@@ -59,6 +59,11 @@ function ContextGroup(subContexts::Context...)
 			end
 		end |> eval
 	end
+	for c in subContexts
+		if c in keys(contextRuleManager.groups)
+			error("Context $c is already part of another ContextGroup.")
+		end
+	end
 	makefun()
 	contextSet = Set([subContexts...])
 	group = ContextGroup(contextSet, getActiveContext)
@@ -77,8 +82,7 @@ end
 
 Returns the currently active context from the group.
 """
-(contextGroup::ContextGroup)() = contextGroup.getActiveContext()#only(filter(isActive, contextGroup.subContexts)) #filter(subContext -> isActive(subContext), contextGroup.subContexts)[1]
-
+(contextGroup::ContextGroup)()::Context = contextGroup.getActiveContext()
 """
     struct ContextStateMachine
 
@@ -114,7 +118,11 @@ function checkStateMachineCondition(csm::ContextStateMachine)
 	end
 	while true
 		oldContext = csm()
-		transitions = csm.transitions[oldContext]
+		if haskey(csm.transitions, oldContext)
+			transitions = csm.transitions[oldContext]
+		else
+			break
+		end
 		newContext = nothing
 		for transition in transitions
 			eval(eval(transition))
@@ -215,6 +223,10 @@ macro ContextStateMachine(name, body)
 	transitions::Expr = quote Dict{Context, Vector{QuoteNode}}() end
 	typechecks::Expr = quote end
 	transitionHelpDict = Dict{Symbol, Vector{QuoteNode}}()
+	toTransitions::Set = Set{Symbol}()
+	fromTransitions::Set = Set{Symbol}()
+	contexts::Set{Symbol} = Set{Symbol}()
+	initial::Symbol = Symbol("")
 	for arg in body.args
 		if !(arg isa Expr && arg.head == :macrocall)
 			error("ContextStateMachine macro requires @variable, @contexts, @initialState, and @transition expressions. Found $arg")
@@ -234,11 +246,13 @@ macro ContextStateMachine(name, body)
 				if !(c isa Symbol)
 					error("Contexts must be defined with symbols. Found $c")
 				end
+				push!(contexts, c)
 				s = QuoteNode(Symbol("$c"))
 				push!(clist.args[2].args, :($s => $c))
 			end
 			push!(subContexts.args[2].args, clist)
 		elseif arg.args[1] == Symbol("@initialState")
+			initial = arg.args[3]
 			initalExpr = quote activateContext(($(arg.args[3]))) end
 		elseif arg.args[1] == Symbol("@transition")
 			if !(arg.args[3].args[1] == Symbol("=>") && arg.args[3].args[2] isa Symbol)
@@ -253,12 +267,25 @@ macro ContextStateMachine(name, body)
 				end
 			end)
 			transitionHelpDict[fromContext] = push!(get(transitionHelpDict, fromContext, Vector{QuoteNode}()), expr)
+			push!(toTransitions, toContext)
+			push!(fromTransitions, fromContext)
 		else
 			error("ContextStateMachine macro requires @variables, @contexts, @initialState, and @transition expressions. Found $arg")
 		end
 	end
+	if initial == Symbol("")
+		error("ContextStateMachine macro requires an @initialState declaration.")
+	end
 	for (fromContext, exprs) in transitionHelpDict
 		push!(transitions.args[2].args, :($fromContext => $exprs))
+	end
+	for context in contexts
+		if !(context in fromTransitions)
+			@warn("Context $context has no outgoing transition defined in the context state machine. Once reached, it will be a terminal state.")
+		end
+		if !(context in toTransitions) && context != initial
+			@warn("Context $context has no incoming transition defined in the context state machine. It will never be reached from any other state.")
+		end
 	end
 
 	returnExpr = quote
