@@ -1,7 +1,13 @@
 name = "Contexts"
 uuid = "d092ff92-9eeb-4ab6-a2ac-bfa3dd0c68f9"
 authors = ["Christian Gutsche"]
-version = "1.0"
+version = "1.0.0"
+
+[deps]
+JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
+OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
+Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+Satisfiability = "160ab843-0bc6-4ba4-9585-b7478b70f443"
 
 [compat]
 julia = "1"
@@ -11,6 +17,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
-
-[deps]
-Parameters = "d96e819e-fc66-5662-9728-84c9c7592b0a"

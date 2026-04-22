@@ -1,6 +1,9 @@
  __precompile__()
 module Contexts
 using Parameters
+using OrderedCollections
+using Satisfiability
+using JuliaFormatter
 
 include("ContextTypeDef.jl")
 include("PetriNetTypeDef.jl")
@@ -12,6 +15,7 @@ include("ContextRoleDef.jl")
 include("ContextRulesUtils.jl")
 include("RoleChanges.jl")
 include("PetriNetUtils.jl")
+
 
 export addContext, getActiveContexts, isActive, activateContext, deactivateContext, deactivateAllContexts, addMixin, addTeam, getTeam, getDynamicTeam, getDynamicTeams, getRoles, getRolesOfTeam, getObjectOfRole, getDynamicTeamID, getObjectsOfRole, hasRole, getTeamPartners, getContexts, getMixins, getMixin, getRole, <<, >>, changeRoles, assignRoles, disassignRoles, assignMixin, disassignMixin
 export @newContext, @newTeam, @newMixin, @team, @context, @activeContext, @assignRoles, @disassignRoles, @changeRoles, @newDynamicTeam
@@ -27,5 +31,7 @@ include("ContextPNRules.jl")
 export exclusion, weakExclusion, directedExclusion, strongInclusion, weakInclusion, requirement, alternative
 export getConstraints
 
+include("COPCompositionLanguage.jl")
+export @contextual, contextualFunctions
 
 end
