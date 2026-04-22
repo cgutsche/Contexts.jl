@@ -10,17 +10,17 @@ Holds all context-related data structures, including:
 """
 
 @with_kw mutable struct RoleManagement
-	mixins::Dict{Context, Dict{Any, Vector{DataType}}} = Dict()
-	mixinTypeDB::Dict{Any, Dict{Context, DataType}} = Dict()
-	mixinDB::Dict{Any, Dict{Context, Vector{Any}}} = Dict()
+	mixins::Dict{Union{Context, Nothing}, Dict{Any, Vector{DataType}}} = Dict()
+	mixinDB::Dict{Any, Dict{Union{Context, Nothing}, Vector{Any}}} = Dict()
 	teamsAndRoles::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, DataType}}} = Dict()
 	roleDB::Dict{Any, Dict{Union{Context, Nothing}, Dict{Union{Team, DynamicTeam}, Role}}} = Dict()
+	roleDBInv::Dict{Role, Dict{Union{Context, Nothing}, Dict{Union{Team, DynamicTeam}, Any}}} = Dict()
 	teamDB::Dict{Union{Context, Nothing}, Dict{Team, Vector{Dict{DataType, Any}}}} = Dict()
-	dynTeamDB::Dict{Union{Context, Nothing}, Dict{DynamicTeam, Dict{DataType, Vector}}} = Dict()
+	dynTeamDB::Dict{Union{Context, Nothing}, Dict{DynamicTeam, Dict{DataType, Set}}} = Dict()
 	dynTeamsAndData::Dict{Union{Context, Nothing}, Dict{Any, Dict{DataType, Dict}}} = Dict()
 	dynTeamsProp::Dict{Union{Context, Nothing}, Dict{Any, Any}} = Dict()
 end
-global roleManager = RoleManagement()
+const global roleManager = RoleManagement()
 
 """
     addMixin(context, contextualType, mixinNameSymbol)
@@ -117,7 +117,7 @@ Returns true or false.
 Example:
     hasMixin(MyContext, obj, MyMixin)
 """
-function hasMixin(context::Context, obj, mixin::Type)
+function hasMixin(context::Union{Context, Nothing}, obj, mixin::Type)
 	if obj in keys(roleManager.mixinDB)
 		if context in keys(roleManager.mixinDB[obj])
 			if mixin in [typeof(m) for m in roleManager.mixinDB[obj][context]]
@@ -167,7 +167,7 @@ Arguments:
 Example:
     getMixins(MyContext, MyType)
 """
-function getMixins(context::Context, type)
+function getMixins(context::Union{Context, Nothing}, type)
 	if !(type in keys(roleManager.mixinDB))
 		return []
 	end
@@ -187,7 +187,7 @@ Arguments:
 Example:
     getMixin(MyContext, MyType, MyMixin)
 """
-function getMixin( context::Context, type, mixin::Type)
+function getMixin( context::Union{Context, Nothing}, type, mixin::Type)
 	if !(mixin in roleManager.mixins[context][typeof(type)])
 		error("Mixin $mixin not defined in context $context for type $(typeof(type))")
 	end
@@ -211,7 +211,7 @@ Arguments:
 Example:
     getObjectsOfMixin(MyContext, MyMixin)
 """
-function getObjectsOfMixin(context::Context, mixin::Type)
+function getObjectsOfMixin(context::Union{Context, Nothing}, mixin::Type)
 	l = []
 	for obj in keys(roleManager.mixinDB)
 		for mixin_i in values(roleManager.mixinDB[obj][context])
@@ -262,13 +262,12 @@ Example:
     getObjectOfRole(MyContext, MyDynTeam, Manager)
 """
 function getObjectOfRole(context::Union{Context, Nothing}, team::DynamicTeam, role::Role)
-	for obj in keys(roleManager.roleDB)
-		if context in keys(roleDB[obj])
-			if roleManager.roleDB[obj][context][team] == role
-					return obj
-			end
-		end
+	if role in keys(roleManager.roleDBInv) &&
+		context in keys(roleManager.roleDBInv[role]) && 
+		team in keys(roleManager.roleDBInv[role][context])
+		return roleManager.roleDB[obj][context][team]
 	end
+	return nothing
 end
 """
     getObjectOfRole(team::DynamicTeam, role::Role)
@@ -382,7 +381,6 @@ Example:
     hasRole(MyContext, obj, Manager, MyTeam)
 """
 function hasRole(context::Union{Context, Nothing}, obj, role::Type, team::Team)
-	#if role in typeof.(collect(keys(roleManager.roleDB[obj][context][team])))
 	for concreteRole in getRoles(context, obj, team)
 		if typeof(concreteRole) == role
 			return true
@@ -528,40 +526,40 @@ end
 """
     getRole(context::Union{Context, Nothing}, obj::T, team::DynamicTeam) where T
 
-Returns the role for an object in a dynamic team in a context.
+Returns the role for an object in a (dyanmic) team in a context.
 
 Arguments:
 - `context`: Context or nothing
 - `obj`: Object
-- `team`: DynamicTeam type
+- `team`: AbstractTeam type
 
 Example:
     getRole(MyContext, obj, MyDynTeam)
 """
-function getRole(context::Union{Context, Nothing}, obj::T, team::DynamicTeam) where T
-	if !(haskey(roleManager.roleDB, obj))
-		return nothing
-	elseif !(haskey(roleManager.roleDB[obj], context))
-		return nothing
-	elseif !(haskey(roleManager.roleDB[obj][context], team))
-		return nothing
-	end
-	roleManager.roleDB[obj][context][team]
+function getRole(context::Union{Context, Nothing}, obj::T, team::AbstractTeam) where T
+	contextsTeamsDict = get(roleManager.roleDB, obj, nothing)
+    contextsTeamsDict === nothing && return nothing
+
+    teamDict = get(contextsTeamsDict, context, nothing)
+    teamDict === nothing && return nothing
+
+    return get(teamDict, team, nothing)
 end
 
 """
     getRole(obj::T, team::DynamicTeam) where T
 
+Returns the role for an object in a (dyanmic) team in a context.
 Convenience function to getRole with no context.
 
 Arguments:
 - `obj`: Object
-- `team`: DynamicTeam type
+- `team`: AbstractTeam type
 
 Example:
     getRole(obj, MyDynTeam)
 """
-function getRole(obj::T, team::DynamicTeam) where T
+function getRole(obj::T, team::AbstractTeam) where T
 	getRole(nothing, obj, team)
 end
 
@@ -745,7 +743,7 @@ Example:
     getDynamicTeamID(MyContext, MyDynTeam)
 """
 function getDynamicTeamID(context::Union{Context, Nothing}, team::DynamicTeam)
-	roleManager.dynTeamsProp[context][team]
+	roleManager.dynTeamsProp[context][team]["ID"]
 end
 
 """
@@ -760,7 +758,7 @@ Example:
     getDynamicTeamID(MyDynTeam)
 """
 function getDynamicTeamID(team::DynamicTeam)
-	roleManager.dynTeamsProp[nothing][team]
+	roleManager.dynTeamsProp[nothing][team]["ID"]
 end
 
 """

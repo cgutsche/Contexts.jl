@@ -287,10 +287,14 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 		if arg.args[1] === Symbol("@relationalAttributes")
 			push!(relationalArgExpr.args, ((arg.args[3]).args)...)
 		elseif arg.args[1] === Symbol("@minPlayers")
+			if !(arg.args[3] isa Integer)
+				error("Minimum Number of Players must be a finite integer.")
+			end
 			if arg.args[3] < 2
 				error("Minimum Number of Players must be at least 2.")
 			end
 			minPlayers = arg.args[3]
+			
 		elseif arg.args[1] === Symbol("@maxPlayers")
 			maxPlayers = arg.args[3]
 		elseif arg.args[1] === Symbol("@IDAttribute")
@@ -324,6 +328,9 @@ macro newDynamicTeam(contextName, teamName, teamContent)
 				maxRoles = cardinalityList[1][4:end-2]
 			end
 			minRoles = occursin("Inf", minRoles) ? parse(Float64, minRoles) : parse(Int64, minRoles)
+			if minRoles == Inf
+				error("Minimum Number of Role $role must be finite.")
+			end
 			if minRoles < 0 error("Cardinality of Role can not be negative!") end
 			maxRoles = occursin("Inf", maxRoles) ? parse(Float64, maxRoles) : parse(Int64, maxRoles)
 			if minRoles > maxRoles error("Minimum cardinality must be smaller than maximum!") end

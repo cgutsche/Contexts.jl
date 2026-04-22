@@ -1,6 +1,14 @@
 #### Context regarded type definitions ####
 
 """
+    NonRigidType
+
+Abstract supertype for all mixin and role types.
+"""
+abstract type NonRigidType end
+
+
+"""
     Mixin
 
 Abstract supertype for all mixin types.
@@ -8,7 +16,7 @@ Mixins allow context-dependent extension of types.
 
 Concrete mixins should be defined with the `@mixin` macro.
 """
-abstract type Mixin end
+abstract type Mixin <: NonRigidType end
 
 """
     Role
@@ -18,7 +26,14 @@ Roles represent context-dependent behaviors or responsibilities.
 
 Concrete roles should be defined within the `@newTeam` and `@newDynamicTeam` macro.
 """
-abstract type Role end
+abstract type Role <: NonRigidType end
+
+"""
+    AbstractTeam
+
+Abstract supertype for all Team and DynamicTeam types.
+"""
+abstract type AbstractTeam end
 
 """
     Team
@@ -29,7 +44,7 @@ Teams group roles and their relationships in a relational context.
 
 Concrete teams should be defined within the `@newTeam` and `@newDynamicTeam` macro.
 """
-abstract type Team end
+abstract type Team <: AbstractTeam end
 
 """
     DynamicTeam
@@ -40,7 +55,7 @@ Dynamic teams allow runtime changes in team composition and cardinality.
 
 Concrete teams should be defined within the `@newTeam` and `@newDynamicTeam` macro.
 """
-abstract type DynamicTeam end
+abstract type DynamicTeam <: AbstractTeam end
 
 """
     AbstractContext
