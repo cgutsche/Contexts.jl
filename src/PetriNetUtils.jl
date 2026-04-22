@@ -59,17 +59,6 @@ function mergeCompiledPetriNets(pn1::CompiledPetriNet, pn2::CompiledPetriNet)
     ContextMatrices_merge = vcat(pn1.ContextMatrices, pn2.ContextMatrices)
 
     ContextMap_merge = merge(pn1.ContextMap, pn2.ContextMap)
-    if length(pn1.ContextMatrices[1]) != length(pn2.ContextMatrices[1])
-        if length(pn1.ContextMatrices[1]) < length(pn2.ContextMatrices[1])
-            for i in 1:length(pn1.ContextMatrices)
-                ContextMatrices_merge[i] = hcat(pn1.ContextMatrices[i], zeros(size(pn1.ContextMatrices[i])[1], length(ContextMap_merge)-size(pn1.ContextMatrices[i])[2]))
-            end
-        else
-            for i in length(pn1.ContextMatrices)+1:length(pn1.ContextMatrices)+length(pn2.ContextMatrices)
-                ContextMatrices_merge[i] = hcat(pn2.ContextMatrices[i-length(pn1.ContextMatrices)], zeros(size(pn2.ContextMatrices[i-length(pn1.ContextMatrices)])[1], length(ContextMap_merge)-size(pn2.ContextMatrices[i-length(pn1.ContextMatrices)])[2]))
-            end
-        end
-    end
 
     UpdateMatrix_cast1 = zeros(length(ContextMap_merge), size_pn1_dim2+size_pn2_dim2)
     UpdateMatrix_cast2 = zeros(length(ContextMap_merge), size_pn1_dim2+size_pn2_dim2)
@@ -352,8 +341,6 @@ Example:
     compile(pn)
 """
 function compile(pn::PetriNet)
-    # should test here if name is given two times
-    # should test here if arcs are connected correctly (not place to place etc.)
     np = length(pn.places)                              # number of places
     nt = length(pn.transitions)                         # number of transitions
     nc = length(getContexts())                          # number of contexts
@@ -380,10 +367,10 @@ function compile(pn::PetriNet)
 
 
     C = nothing                                         # Context matrix
+    C_Alt::Vector{Union{Nothing, AbstractContext}} = []
     U = zeros(Float64, nc, nt)                          # Update matrix
     for transition in pn.transitions
-        c = sign.(genContextRuleMatrix(reduceRuleToElementary(transition.contexts), cdict, nc))
-        C == nothing ? C = [c] : C = [C; [c]]
+        push!(C_Alt, transition.contexts)
         for update in transition.updates
             if update.updateValue == on
                 U[cdict[update.context], tdict[transition]] = 1
@@ -410,5 +397,5 @@ function compile(pn::PetriNet)
             W_i[pdict[arc.to], tdict[arc.from]] = arc.weight
         end
     end
-    CompiledPetriNet(W_i, W_o, W_inhibitor, W_test, t, P, C, U, cdict)
+    CompiledPetriNet(W_i, W_o, W_inhibitor, W_test, t, P, C_Alt, U, cdict)
 end

@@ -74,16 +74,8 @@ Returns nothing, but modifies the Petri net state and context activations.
 """
 function runPN(pn::CompiledPetriNet)
     # Get number of contexts dimensions of the Petri net
-    nContexts::Int64 = size(pn.ContextMatrices[1])[2]
+    nContexts::Int64 = length(pn.ContextMap)
     nTransitions::Int64 = size(pn.WeightMatrix_in)[2]
-    
-    # Initialize context activation vector
-    a::Vector{Float64} = zeros(nContexts)
-    for context in getActiveContexts()
-        if context in keys(pn.ContextMap)
-            a[pn.ContextMap[context]] = 1
-        end
-    end
 
     # Preallocate arrays outside the loop to avoid repeated allocations
     T::Matrix{Float64} = zeros(Float64, size(pn.tokenVector, 1), nTransitions)
@@ -97,7 +89,7 @@ function runPN(pn::CompiledPetriNet)
     u = zeros(Float64, nContexts)
 
     # Create vector to map indices back to context objects
-    ContextVector::Vector{Union{<:Context, <:AbstractContextRule}} = Vector{Union{<:Context, <:AbstractContextRule}}(undef, nContexts)
+    ContextVector::Vector{Context} = Vector{Context}(undef, nContexts)
     for context in keys(pn.ContextMap)
         ContextVector[pn.ContextMap[context]] = context
     end
@@ -115,17 +107,7 @@ function runPN(pn::CompiledPetriNet)
         f_test .= nonNeg(findmin(T .- pn.WeightMatrix_test, dims=1)[1])
         
         # Calculate context-based firing conditions
-        f_context .= zeros(1, nTransitions)
-        for i in 1:nTransitions
-            # Extract positive and negative context conditions
-            h1::Matrix{Float64} = pos(transpose(pn.ContextMatrices[i]))
-            h2::Matrix{Float64} = -neg(transpose(pn.ContextMatrices[i]))
-            # Check if all required contexts are active
-            b1::Bool = (findmin(findmax(h1 .- (h1 .* matrixify(a, size(pn.ContextMatrices[i])[1])), dims=1)[1], dims=2)[1])[1] == 0
-            # Check if all forbidden contexts are inactive
-            b2::Bool = (findmax(findmin(h2 .* matrixify(a, size(pn.ContextMatrices[i])[1]), dims=1)[1], dims=2)[1])[1] == 0
-            f_context[1, i] = 1 * b1 * b2
-        end
+        f_context = reshape(1.0 .* isActive.(pn.ContextMatrices), (1, nTransitions))
 
         # Combine all firing conditions
         f .= f_normal .* f_inhibitor .* f_test .* f_context
@@ -145,13 +127,12 @@ function runPN(pn::CompiledPetriNet)
 
         # Update context activity based on fired transitions
         u .= vec(sign.(pn.UpdateMatrix * transpose(f)))
-        a = pos(a + u)
         
         # Activate/deactivate contexts based on new state
-        for context in ContextVector[Bool.(a)]
+        for context in ContextVector[Bool.(pos(u))]
             activateContextWithoutPN(context)
         end
-        for context in ContextVector[Bool.((a .- 1).^2)]
+        for context in ContextVector[Bool.(neg(u))]
             deactivateContextWithoutPN(context)
         end
 
@@ -159,6 +140,7 @@ function runPN(pn::CompiledPetriNet)
         pn.tokenVector = vec(pn.tokenVector .+ (pn.WeightMatrix_in .- pn.WeightMatrix_out) * transpose(f))
     end
 end
+
 
 """
     runPN(pn::CompiledPetriNet, N::Int)
@@ -305,17 +287,7 @@ function runPNInf(pn::CompiledPetriNet)
         f_test .= nonNeg(findmin(T .- pn.WeightMatrix_test, dims=1)[1])
         
         # Calculate context-based firing conditions
-        f_context .= zeros(1, nTransitions)
-        for i in 1:nTransitions
-            # Extract positive and negative context conditions
-            h1::Matrix{Float64} = pos(transpose(pn.ContextMatrices[i]))
-            h2::Matrix{Float64} = -neg(transpose(pn.ContextMatrices[i]))
-            # Check if all required contexts are active
-            b1::Bool = (findmin(findmax(h1 .- (h1 .* matrixify(a, size(pn.ContextMatrices[i])[1])), dims=1)[1], dims=2)[1])[1] == 0
-            # Check if all forbidden contexts are inactive
-            b2::Bool = (findmax(findmin(h2 .* matrixify(a, size(pn.ContextMatrices[i])[1]), dims=1)[1], dims=2)[1])[1] == 0
-            f_context[1, i] = 1 * b1 * b2
-        end
+        f_context = 1.0 .* isActive.(pn.ContextMatrices)
 
         # Combine all firing conditions
         f .= f_normal .* f_inhibitor .* f_test .* f_context

@@ -213,6 +213,5 @@ Returns `true` if active, `false` otherwise.
 
 function isActive(context::Context)
 	__isActive(context)
-	#context in getActiveContexts()
 end
 
