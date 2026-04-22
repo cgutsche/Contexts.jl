@@ -1,7 +1,3 @@
-using Test
-include("../src/Contexts.jl")
-using .Contexts
-
 @testset "Context Basics" begin
     # Test context creation and management
     @testset "Context Creation" begin
